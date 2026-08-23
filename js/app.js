@@ -1,6 +1,7 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v3.1
+   DVC AI CHATBOT — app.js v3.2
    AI API + Smart Key Switching + User Tracking
+   Fully Responsive + PWA + Keyboard Fix
    promode × @dvc 2026
    ============================================ */
 
@@ -192,6 +193,9 @@
     if (!ok) return;
 
     const keys = getKeys();
+
+    // Setup mobile keyboard fix FIRST (works even on setup screen)
+    setupKeyboardFix();
 
     if (keys.length === 0) {
       showSetupScreen();
@@ -399,7 +403,8 @@
   // ============ AUTO RESIZE ============
   function autoResize() {
     userInput.style.height = 'auto';
-    userInput.style.height = Math.min(userInput.scrollHeight, 200) + 'px';
+    const maxH = window.innerWidth <= 480 ? 80 : 200;
+    userInput.style.height = Math.min(userInput.scrollHeight, maxH) + 'px';
   }
 
   // ============ SIDEBAR ============
@@ -718,6 +723,54 @@
     html = html.replace(/^(\d+)\. (.+)/gm, '<strong>$1.</strong> $2');
 
     return html;
+  }
+
+  // ============ MOBILE KEYBOARD FIX ============
+  // Uses visualViewport API to detect keyboard open/close and adjust layout
+  function setupKeyboardFix() {
+    if (!window.visualViewport) return;
+
+    const vv = window.visualViewport;
+    let isKeyboardOpen = false;
+    let baseHeight = window.innerHeight;
+
+    function handleResize() {
+      const currentHeight = vv.height;
+      const heightDiff = baseHeight - currentHeight;
+
+      // Keyboard is open if viewport shrunk by > 100px
+      isKeyboardOpen = heightDiff > 100;
+
+      // Adjust body height to match visible area (prevents chat being hidden)
+      document.body.style.height = `${currentHeight}px`;
+
+      // Scroll messages to bottom when keyboard opens so user sees latest msg
+      if (isKeyboardOpen) {
+        const messagesEl = $('#messages');
+        if (messagesEl) {
+          setTimeout(() => {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }, 50);
+        }
+      }
+    }
+
+    vv.addEventListener('resize', handleResize);
+    vv.addEventListener('visualViewportChange', handleResize);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => { baseHeight = window.innerHeight; handleResize(); }, 100);
+    });
+
+    // Also handle focus/blur on the input as fallback for older browsers
+    const userInput = document.getElementById('userInput');
+    if (userInput) {
+      userInput.addEventListener('focus', () => {
+        setTimeout(() => {
+          const messagesEl = document.getElementById('messages');
+          if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+        }, 300);
+      });
+    }
   }
 
   // ============ BOOT ============

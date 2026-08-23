@@ -1,5 +1,6 @@
 /* ============================================
-   DVC AI CHATBOT — MODERN DARK THEME v2.0
+   DVC AI CHATBOT — MODERN DARK THEME v3.0
+   Fully Responsive + PWA + Keyboard Fix
    promode × @dvc 2026
    ============================================ */
 
@@ -22,6 +23,9 @@
   --success: #238636;
   --danger: #da3633;
   --warning: #d29922;
+  /* Dynamic viewport height — handles mobile keyboard */
+  --dvh: 100vh;
+  --dvh-sb: 100svh;
 }
 
 [data-theme="light"] {
@@ -39,20 +43,40 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ========== PWA: Prevent overscroll, hide browser chrome ========== */
+html {
+  height: 100%;
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
 html, body {
   height: 100%;
   overflow: hidden;
+  /* Dynamic viewport — works with keyboard open */
+  height: var(--dvh-sb);
+}
+
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
 }
 
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   display: flex;
+  flex-direction: row;
   transition: background-color 0.3s ease, color 0.3s ease;
+  /* Prevent rubber-banding on iOS */
+  overscroll-behavior: none;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
-::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
@@ -66,16 +90,18 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 10000;
+  padding: 20px;
 }
 
 .offline-content {
   text-align: center;
   animation: fadeInUp 0.5s ease;
+  max-width: 400px;
 }
 
 .offline-icon {
-  font-size: 80px;
-  margin-bottom: 20px;
+  font-size: 64px;
+  margin-bottom: 16px;
   animation: pulse-icon 2s infinite;
 }
 
@@ -85,29 +111,29 @@ body {
 }
 
 .offline-screen h1 {
-  font-size: 36px;
+  font-size: clamp(24px, 5vw, 36px);
   color: #da3633;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .offline-screen p {
   color: #8b949e;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .offline-footer {
-  margin-top: 30px;
+  margin-top: 24px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   color: #6e7681;
 }
 
 .offline-pulse {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   background: #da3633;
   border-radius: 50%;
   animation: pulse-dot 1.5s infinite;
@@ -122,44 +148,47 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .setup-card {
-  max-width: 500px;
-  width: 90%;
+  max-width: 480px;
+  width: 100%;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 32px;
+  padding: clamp(20px, 4vw, 32px);
   text-align: center;
   animation: fadeInUp 0.4s ease;
 }
 
 .setup-logo {
-  font-size: 56px;
-  margin-bottom: 12px;
+  font-size: 48px;
+  margin-bottom: 10px;
   filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.5));
 }
 
 .setup-card h1 {
-  font-size: 28px;
+  font-size: clamp(22px, 4vw, 28px);
   background: var(--gradient-main);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .setup-card p {
   color: var(--text-secondary);
-  font-size: 14px;
-  margin-bottom: 24px;
+  font-size: 13px;
+  margin-bottom: 20px;
 }
 
 .setup-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   text-align: left;
 }
 
@@ -243,15 +272,15 @@ body {
 /* ============ SIDEBAR ============ */
 .sidebar {
   width: 280px;
+  min-width: 280px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   z-index: 100;
+  height: 100%;
 }
-
-.sidebar.hidden { margin-left: -280px; }
 
 .sidebar-header {
   padding: 16px;
@@ -306,6 +335,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 12px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chat-history-item {
@@ -424,15 +454,19 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100%;
+  /* CRITICAL: flex column so messages + input share vertical space */
 }
 
 .topbar {
-  padding: 14px 20px;
+  padding: 12px 16px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
+  z-index: 50;
 }
 
 .menu-toggle {
@@ -440,9 +474,9 @@ body {
   border: none;
   color: var(--text-primary);
   cursor: pointer;
-  padding: 8px;
+  padding: 6px;
   border-radius: 8px;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   transition: background 0.2s ease;
@@ -453,9 +487,9 @@ body {
 .topbar-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -481,7 +515,7 @@ body {
   border: none;
   font-size: 18px;
   cursor: pointer;
-  padding: 6px 10px;
+  padding: 6px 8px;
   border-radius: 8px;
   transition: background 0.2s ease;
 }
@@ -492,69 +526,72 @@ body {
 .messages {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 16px;
+  padding: 20px 16px;
   scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  /* KEYBOARD FIX: min-height 0 prevents flex from overflowing */
+  min-height: 0;
 }
 
 .welcome-screen {
   max-width: 800px;
-  margin: 40px auto;
-  padding: 20px;
+  margin: 20px auto;
+  padding: 10px;
 }
 
 .welcome-logo {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 32px;
 }
 
 .welcome-logo-circle {
-  width: 90px;
-  height: 90px;
+  width: 80px;
+  height: 80px;
   background: var(--gradient-main);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 44px;
-  margin: 0 auto 20px;
+  font-size: 40px;
+  margin: 0 auto 16px;
   box-shadow: 0 8px 32px rgba(124, 58, 237, 0.35);
   animation: float 3s ease-in-out infinite;
 }
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-8px); }
 }
 
 .welcome-logo h1 {
-  font-size: 42px;
+  font-size: clamp(28px, 6vw, 42px);
   background: var(--gradient-main);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .welcome-logo p {
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .suggestion-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
 }
 
 .suggestion-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 18px;
+  padding: 16px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s ease;
   text-align: left;
   color: inherit;
@@ -563,19 +600,19 @@ body {
 .suggestion-card:hover {
   background: var(--bg-hover);
   border-color: var(--accent);
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.2);
 }
 
-.sg-icon { font-size: 26px; }
-.sg-title { font-weight: 700; font-size: 15px; color: var(--text-primary); }
+.sg-icon { font-size: 24px; }
+.sg-title { font-weight: 700; font-size: 14px; color: var(--text-primary); }
 .sg-desc { font-size: 12px; color: var(--text-secondary); }
 
 .message-row {
   max-width: 800px;
-  margin: 0 auto 20px;
+  margin: 0 auto 16px;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   animation: fadeInUp 0.3s ease;
 }
 
@@ -587,13 +624,13 @@ body {
 .message-row.user { flex-direction: row-reverse; }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 
@@ -608,11 +645,11 @@ body {
 }
 
 .message-bubble {
-  max-width: calc(100% - 60px);
-  padding: 14px 18px;
-  border-radius: 16px;
-  line-height: 1.6;
-  font-size: 15px;
+  max-width: calc(100% - 52px);
+  padding: 12px 16px;
+  border-radius: 14px;
+  line-height: 1.55;
+  font-size: 14px;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -633,11 +670,11 @@ body {
   background: #0d1117;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 14px;
+  padding: 12px;
   overflow-x: auto;
-  margin: 12px 0;
+  margin: 10px 0;
   font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .message-bubble pre code {
@@ -648,10 +685,10 @@ body {
 
 .message-bubble code {
   background: rgba(110, 118, 129, 0.3);
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
   font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .typing-indicator {
@@ -661,8 +698,8 @@ body {
 }
 
 .typing-indicator span {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   background: var(--text-muted);
   border-radius: 50%;
   animation: typing-bounce 1.4s infinite;
@@ -673,7 +710,7 @@ body {
 
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-  30% { transform: translateY(-8px); opacity: 1; }
+  30% { transform: translateY(-6px); opacity: 1; }
 }
 
 .error-bubble {
@@ -682,11 +719,12 @@ body {
   color: var(--danger) !important;
 }
 
-/* ============ INPUT AREA ============ */
+/* ============ INPUT AREA — CRITICAL FOR KEYBOARD ============ */
 .input-area {
-  padding: 16px 20px;
+  padding: 12px 16px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
 }
 
 .input-wrapper {
@@ -694,11 +732,11 @@ body {
   margin: 0 auto;
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
-  border-radius: 24px;
-  padding: 10px 14px;
+  border-radius: 22px;
+  padding: 8px 12px;
   transition: border-color 0.2s ease;
 }
 
@@ -716,13 +754,14 @@ body {
   font-size: 15px;
   font-family: inherit;
   resize: none;
-  max-height: 200px;
-  line-height: 1.5;
+  max-height: 120px;
+  line-height: 1.4;
+  padding: 4px 0;
 }
 
 .send-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--gradient-main);
   border: none;
@@ -747,10 +786,10 @@ body {
 
 .input-footer {
   max-width: 800px;
-  margin: 10px auto 0;
+  margin: 6px auto 0;
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
 }
 
@@ -762,10 +801,10 @@ body {
 .user-badge {
   background: rgba(124, 58, 237, 0.15);
   color: var(--accent);
-  padding: 3px 10px;
-  border-radius: 20px;
+  padding: 2px 8px;
+  border-radius: 16px;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 9px;
   letter-spacing: 0.5px;
   border: 1px solid rgba(124, 58, 237, 0.3);
   white-space: nowrap;
@@ -781,7 +820,7 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  padding: 20px;
+  padding: 16px;
 }
 
 .modal-card {
@@ -790,7 +829,7 @@ body {
   border-radius: 16px;
   width: 100%;
   max-width: 480px;
-  max-height: 80vh;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   animation: fadeInUp 0.3s ease;
@@ -800,12 +839,12 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 18px 20px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .modal-header h2 {
-  font-size: 20px;
+  font-size: 18px;
   color: var(--text-primary);
 }
 
@@ -823,17 +862,18 @@ body {
 .modal-body {
   padding: 20px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-field {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .modal-field label {
   display: block;
   font-size: 13px;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .modal-hint {
@@ -846,8 +886,8 @@ body {
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 12px;
-  max-height: 200px;
+  padding: 10px;
+  max-height: 180px;
   overflow-y: auto;
   font-family: monospace;
   font-size: 12px;
@@ -857,9 +897,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .saved-keys-list .key-item:hover {
@@ -885,21 +925,176 @@ body {
 
 .overlay.show { display: block; }
 
-/* ============ RESPONSIVE ============ */
-@media (max-width: 768px) {
+/* =============================================
+   RESPONSIVE — TABLET & MOBILE
+   ============================================= */
+
+/* Tablet: sidebar becomes overlay */
+@media (max-width: 900px) {
   .sidebar {
     position: fixed;
     left: 0;
     top: 0;
     bottom: 0;
-    margin-left: -280px;
+    margin-left: -300px;
     transition: margin-left 0.3s ease;
+    z-index: 200;
+    width: 280px;
   }
 
-  .sidebar.show { margin-left: 0; }
+  .sidebar.show {
+    margin-left: 0;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  }
 
-  .welcome-logo h1 { font-size: 32px; }
-  .welcome-logo-circle { width: 70px; height: 70px; font-size: 34px; }
-  .suggestion-grid { grid-template-columns: 1fr; }
-  .input-footer { flex-direction: column; gap: 4px; align-items: center; }
+  .menu-toggle {
+    display: flex;
+  }
+}
+
+/* Mobile: tighter spacing, bigger touch targets */
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
+    margin-left: -100%;
+  }
+
+  .sidebar.show {
+    margin-left: 0;
+  }
+
+  .topbar {
+    padding: 10px 12px;
+  }
+
+  .topbar-title {
+    font-size: 14px;
+  }
+
+  .messages {
+    padding: 14px 10px;
+  }
+
+  .message-row {
+    margin-bottom: 12px;
+  }
+
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .message-bubble {
+    max-width: calc(100% - 44px);
+    padding: 10px 14px;
+    font-size: 14px;
+    border-radius: 12px;
+  }
+
+  .suggestion-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .suggestion-card {
+    padding: 14px;
+  }
+
+  .welcome-logo-circle {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+
+  .input-area {
+    padding: 10px 12px;
+  }
+
+  .input-wrapper {
+    padding: 6px 10px;
+    border-radius: 20px;
+  }
+
+  #userInput {
+    font-size: 16px; /* Prevent iOS zoom on input focus */
+    max-height: 80px;
+  }
+
+  .input-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    font-size: 9px;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .modal-card {
+    max-height: 90vh;
+  }
+}
+
+/* Very small screens (320px width) */
+@media (max-width: 350px) {
+  .message-bubble {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .welcome-logo h1 {
+    font-size: 24px;
+  }
+}
+
+/* Landscape mode on phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .welcome-screen {
+    margin: 10px auto;
+  }
+
+  .welcome-logo {
+    margin-bottom: 16px;
+  }
+
+  .welcome-logo-circle {
+    width: 48px;
+    height: 48px;
+    font-size: 24px;
+  }
+
+  .welcome-logo h1 {
+    font-size: 20px;
+  }
+}
+
+/* Safe areas for phones with notches (iPhone, etc.) */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .topbar {
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+
+  .input-area {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .sidebar {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* ============ PWA: standalone mode (when launched from home screen) ============ */
+@media (display-mode: standalone) {
+  .topbar {
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+
+  .input-area {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ============ PRINT HIDE ============ */
+@media print {
+  body { display: none; }
 }
