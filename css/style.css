@@ -1098,3 +1098,342 @@ body {
 @media print {
   body { display: none; }
 }
+
+/* =============================================
+   UPLOAD + DOWNLOAD SYSTEM v5.1
+   ============================================= */
+
+/* ============ ATTACH BUTTON ============ */
+.attach-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.attach-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+/* ============ ATTACH PREVIEW BAR ============ */
+.attach-preview {
+  max-width: 800px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 12px;
+}
+
+.attach-preview-items {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.attach-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--border-color);
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.attach-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attach-item.file-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 4px;
+  word-break: break-all;
+}
+
+.attach-item.file-item .file-icon { font-size: 18px; }
+
+.attach-item-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: rgba(218, 54, 51, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+.attach-preview-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.attach-preview-clear:hover {
+  background: rgba(218, 54, 51, 0.15);
+  color: var(--danger);
+}
+
+/* ============ IMAGE PREVIEW MODAL ============ */
+.image-preview-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: fadeInUp 0.3s ease;
+}
+
+.image-preview-body {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1;
+  min-height: 200px;
+}
+
+.image-preview-body img {
+  max-width: 100%;
+  max-height: 50vh;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.image-preview-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.image-preview-footer .setup-save-btn {
+  width: 100%;
+}
+
+/* ============ OUTPUT/DOWNLOAD BOX ============ */
+.code-block-wrapper {
+  position: relative;
+  margin: 12px 0;
+  border-radius: 8px;
+  overflow: visible;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 6px 12px;
+  gap: 8px;
+}
+
+.code-block-lang {
+  font-size: 11px;
+  color: var(--accent-2);
+  font-weight: 600;
+  font-family: monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-block-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.code-action-btn {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--accent-2);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.code-action-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+.code-action-btn.copied,
+.code-action-btn.downloaded {
+  background: rgba(35, 134, 54, 0.2);
+  border-color: rgba(35, 134, 54, 0.4);
+  color: #238636;
+}
+
+.message-bubble .code-block-wrapper pre {
+  margin-top: 0;
+  border-radius: 0 0 8px 8px !important;
+}
+
+/* Output panel for generated files */
+.output-panel {
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  background: rgba(35, 134, 54, 0.08);
+  border: 1px dashed rgba(35, 134, 54, 0.3);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.output-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+
+.output-file-icon { font-size: 16px; }
+.output-filename {
+  color: var(--success);
+  font-family: monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.output-filesize { color: var(--text-muted); font-size: 10px; }
+
+.output-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.download-output-btn {
+  background: linear-gradient(135deg, #238636, #2ea043);
+  border: none;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.download-output-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 160, 67, 0.4);
+}
+
+.copy-output-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-output-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Image output preview in AI message */
+.ai-image-output {
+  max-width: 300px;
+  max-height: 250px;
+  border-radius: 8px;
+  margin: 8px 0;
+  border: 1px solid var(--border-color);
+  cursor: zoom-in;
+}
+
+/* Uploaded images in user message */
+.user-image-msg {
+  max-width: 240px;
+  max-height: 220px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255,255,255,0.2);
+  display: block;
+}
+
+.file-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+/* Mobile tweaks */
+@media (max-width: 480px) {
+  .attach-item { width: 48px; height: 48px; }
+  .attach-item.file-item { font-size: 7px; }
+  .output-filename { max-width: 120px; }
+  .code-block-header { padding: 5px 8px; }
+  .code-action-btn { font-size: 10px; padding: 3px 6px; }
+  .user-image-msg { max-width: 180px; max-height: 170px; }
+}
