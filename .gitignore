@@ -1,0 +1,17 @@
+# Secrets & Private Files — NEVER COMMIT
+token+convo.md
+.env
+.env.local
+*.key
+*.pem
+secrets/
+private/
+toggle.sh
+dvc_bot.py
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+__pycache__/

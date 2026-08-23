@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DVC AI — Chatbot</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+<link rel="stylesheet" href="css/style.css?v=2.0">
+</head>
+<body>
+
+<!-- ============ OFFLINE SCREEN ============ -->
+<div class="offline-screen" id="offlineScreen" style="display:none;">
+  <div class="offline-content">
+    <div class="offline-icon">🔌</div>
+    <h1>DVC AI is OFFLINE</h1>
+    <p>The server is currently turned off. Come back later!</p>
+    <div class="offline-footer">
+      <span>Controlled by @dvc via terminal</span>
+      <span class="offline-pulse"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETUP SCREEN (No API Key yet) ============ -->
+<div class="setup-screen" id="setupScreen" style="display:none;">
+  <div class="setup-card">
+    <div class="setup-logo">🤖</div>
+    <h1>DVC AI Setup</h1>
+    <p>Enter your Groq API key to get started. You can get one free at <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a></p>
+    <div class="setup-form">
+      <input type="password" id="setupApiKey" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+      <label class="setup-show-toggle">
+        <input type="checkbox" id="setupShowKey"> Show key
+      </label>
+      <div class="setup-key-multi" id="setupKeyMulti">
+        <p class="multi-hint">💡 Paste multiple keys (one per line) for rotation — bypass rate limits!</p>
+        <textarea id="setupMultiKeys" rows="4" placeholder="gsk_key1&#10;gsk_key2&#10;gsk_key3"></textarea>
+      </div>
+      <button class="setup-save-btn" id="setupSaveBtn">🚀 Launch DVC AI</button>
+      <p class="setup-note">🔒 Key stored locally in your browser only. Never uploaded anywhere.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <span class="logo-icon">🤖</span>
+      <span class="logo-text">DVC AI</span>
+    </div>
+    <button class="new-chat-btn" id="newChatBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      New Chat
+    </button>
+  </div>
+
+  <div class="chat-history" id="chatHistory"></div>
+
+  <div class="sidebar-footer">
+    <div class="model-selector-wrap">
+      <label>Model</label>
+      <select id="modelSelect" class="model-select">
+        <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Best)</option>
+        <option value="llama-3.1-8b-instant">Llama 3.1 8B (Fast)</option>
+        <option value="openai/gpt-oss-120b">GPT-OSS 120B (Pro)</option>
+        <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
+        <option value="gemma2-9b-it">Gemma 2 9B</option>
+        <option value="qwen/qwen3-32b">Qwen 3 32B</option>
+        <option value="allam-2-7b">ALLaM 2 7B (Light)</option>
+        <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout</option>
+        <option value="meta-llama/llama-4-maverick-17b-128e-instruct">Llama 4 Maverick</option>
+        <option value="moonshotai/kimi-k2-instruct">Kimi K2</option>
+        <option value="deepseek-r1-distill-llama-70b">DeepSeek R1 70B</option>
+        <option value="mistral-saba-24b">Mistral Saba 24B</option>
+      </select>
+    </div>
+    <button class="settings-btn" id="settingsBtn">⚙️ API Key Settings</button>
+    <button class="clear-all-btn" id="clearAllBtn">🗑️ Clear All Chats</button>
+    <div class="footer-info">
+      <span class="powered-by">⚡ Powered by Groq × promode</span>
+      <span class="owner-tag">© @dvc 2026</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ MAIN CHAT AREA ============ -->
+<main class="main">
+  <header class="topbar">
+    <button class="menu-toggle" id="menuToggle">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <div class="topbar-title">
+      <span id="currentChatTitle">DVC AI Chatbot</span>
+      <span class="status-dot" id="statusDot"></span>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeToggle" title="Toggle theme">🌙</button>
+    </div>
+  </header>
+
+  <div class="messages" id="messages">
+    <div class="welcome-screen" id="welcomeScreen">
+      <div class="welcome-logo">
+        <div class="welcome-logo-circle">🤖</div>
+        <h1>DVC AI</h1>
+        <p>Your Personal AI Assistant — 24/7, Free, Unlimited</p>
+      </div>
+      <div class="suggestion-grid" id="suggestionGrid">
+        <button class="suggestion-card" data-prompt="Hello! Ano kaya mo gawin?">
+          <span class="sg-icon">👋</span>
+          <span class="sg-title">Say Hello</span>
+          <span class="sg-desc">Start a conversation</span>
+        </button>
+        <button class="suggestion-card" data-prompt="Write a Python script that scrapes website titles using BeautifulSoup">
+          <span class="sg-icon">🐍</span>
+          <span class="sg-title">Write Code</span>
+          <span class="sg-desc">Python, JS, PHP, etc.</span>
+        </button>
+        <button class="suggestion-card" data-prompt="Explain quantum computing in simple Tagalog">
+          <span class="sg-icon">🧠</span>
+          <span class="sg-title">Explain Anything</span>
+          <span class="sg-desc">Any topic, any language</span>
+        </button>
+        <button class="suggestion-card" data-prompt="Magbigay ng business idea na pwede sa Pilipinas with small capital">
+          <span class="sg-icon">💡</span>
+          <span class="sg-title">Business Ideas</span>
+          <span class="sg-desc">PH market focused</span>
+        </button>
+        <button class="suggestion-card" data-prompt="Create a study plan for learning ethical hacking from scratch">
+          <span class="sg-icon">🎯</span>
+          <span class="sg-title">Learning Plan</span>
+          <span class="sg-desc">Structured roadmap</span>
+        </button>
+        <button class="suggestion-card" data-prompt="Summarize the latest trends in AI for 2026">
+          <span class="sg-icon">📰</span>
+          <span class="sg-title">Trends & News</span>
+          <span class="sg-desc">Latest info</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-wrapper">
+      <textarea id="userInput" placeholder="Message DVC AI... (Enter to send, Shift+Enter for new line)" rows="1" autocomplete="off"></textarea>
+      <button class="send-btn" id="sendBtn" title="Send message">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+    <div class="input-footer">
+      <span>DVC AI can make mistakes. Check important info.</span>
+      <span class="key-status" id="keyStatus">🔑 Key #1 active</span>
+    </div>
+  </div>
+</main>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal-overlay" id="settingsModal" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>⚙️ API Key Settings</h2>
+      <button class="modal-close" id="settingsClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label>Current Key Count: <strong id="keyCountDisplay">0</strong></label>
+        <p class="modal-hint">Add multiple keys for rotation. When one hits rate limit, next key is used automatically.</p>
+      </div>
+      <div class="modal-field">
+        <label>Add New Key</label>
+        <input type="password" id="settingsNewKey" placeholder="gsk_..." autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label>Or Paste Multiple (one per line)</label>
+        <textarea id="settingsMultiKeys" rows="3" placeholder="gsk_key1&#10;gsk_key2&#10;gsk_key3"></textarea>
+      </div>
+      <button class="setup-save-btn" id="settingsSaveKeys">💾 Save Keys</button>
+      <div class="modal-field" style="margin-top:16px;">
+        <label>Saved Keys</label>
+        <div id="savedKeysList" class="saved-keys-list"></div>
+      </div>
+      <button class="clear-all-btn" id="settingsClearKeys" style="margin-top:12px;">🗑️ Remove All Keys</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<script src="js/app.js?v=2.0"></script>
+</body>
+</html>
