@@ -1687,3 +1687,107 @@ body {
   .gallery-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .gallery-card img { height: 75px; }
 }
+
+/* ============ RESPONSIVE MEDIA — FIT ALL DEVICES ============ */
+
+/* Tablet & below: shrink video + code */
+@media (max-width: 768px) {
+  .video-embed {
+    max-width: 100%;
+    border-radius: 10px;
+  }
+
+  .message-bubble pre {
+    font-size: 12px;
+    padding: 10px;
+    margin: 8px 0;
+  }
+
+  .code-block-header {
+    padding: 6px 10px;
+  }
+
+  .search-image {
+    max-width: 100%;
+  }
+
+  .search-image img {
+    max-height: 200px;
+  }
+}
+
+/* Mobile: full-width media, bigger touch targets */
+@media (max-width: 480px) {
+  .video-embed {
+    border-radius: 8px;
+    margin: 8px 0;
+  }
+
+  .video-embed iframe,
+  .video-embed iframe-loader {
+    width: 100%;
+    height: 100%;
+  }
+
+  .play-overlay div {
+    width: 54px !important;
+    height: 38px !important;
+  }
+
+  .search-image img {
+    max-height: 180px;
+  }
+
+  .md-image img {
+    max-width: 100%;
+    max-height: 180px;
+    width: auto;
+  }
+
+  .gallery-card img {
+    height: 70px;
+  }
+
+  .output-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .output-actions {
+    justify-content: flex-end;
+  }
+
+  .download-output-btn,
+  .copy-output-btn {
+    padding: 8px 12px;
+    font-size: 11px;
+    min-height: 32px;
+  }
+
+  .code-block-wrapper pre {
+    font-size: 11.5px;
+  }
+
+  /* Horizontal scroll for wide tables */
+  .message-bubble table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 350px) {
+  .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+  .gallery-card img { height: 60px; }
+}
+
+/* Landscape phones — keep input visible */
+@media (max-height: 500px) and (orientation: landscape) {
+  .messages { padding: 8px 16px; }
+  .welcome-screen { padding: 20px; }
+  .welcome-logo-circle { width: 48px; height: 48px; font-size: 24px; }
+  .suggestion-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .suggestion-card { padding: 8px; }
+  .sg-desc { display: none; }
+}

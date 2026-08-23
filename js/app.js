@@ -959,9 +959,7 @@
 
     if (role === 'ai' || role === 'assistant') {
       bubble.innerHTML = formatMarkdown(content);
-      addCodeBlockActions(bubble);
-      addOutputPanels(bubble, content);
-      addMediaEnhancements(bubble);
+      // NOTE: addCodeBlockActions + addOutputPanels called by caller (sendMessage) to avoid double-fire
     } else {
       bubble.textContent = content;
     }
