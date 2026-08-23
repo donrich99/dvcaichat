@@ -1,10 +1,1 @@
-{
-  "users": [
-    {"id": "DVC-TEST01", "first_seen": "2026-08-23T07:18:46Z", "last_seen": "2026-08-23T07:18:46Z", "visits": 1, "blocked": false, "notes": ""},
-    {"id": "DVC-TEST02", "first_seen": "2026-08-23T07:18:46Z", "last_seen": "2026-08-23T07:18:46Z", "visits": 1, "blocked": true, "notes": "test blocked user"},
-    {"id": "DVC-TEST03", "first_seen": "2026-08-23T07:18:46Z", "last_seen": "2026-08-23T07:18:46Z", "visits": 5, "blocked": false, "notes": ""}
-  ],
-  "total": 3,
-  "last_updated": "2026-08-23T07:18:46Z",
-  "updated_by": "@dvc via Telegram Bot"
-}
+{"users":[],"total":0,"last_updated":"2026-08-23T07:20:00Z","updated_by":"@dvc via Telegram Bot"}
