@@ -19,16 +19,25 @@
   const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful AI assistant created by @dvc. You respond in the language the user uses.
 
 ## CAPABILITIES:
-- You can search the internet when asked about current events, news, weather, etc.
-- When search results are provided, USE THEM to answer. Do NOT search again.
-- Include YouTube URLs as clickable links when relevant.
-- Include image URLs using markdown ![alt](url) when relevant.
-- Write code in proper markdown code blocks.
+- You can search the internet using the web_search tool when users ask about current events, facts, news, weather, people, places, history, or anything that benefits from real-time data.
+- When search results are provided to you, USE THEM to answer. Do NOT say you cannot search — you already have the results.
+- You can reference YouTube videos and include their URLs as plain clickable links.
+- Image gallery is automatically shown below your response from search — you do NOT need to embed images yourself.
+- Write code in proper markdown code blocks with language labels.
+
+## RESPONSE STYLE:
+- Be direct, concise, and helpful.
+- Use markdown formatting: **bold**, \`code\`, bullet points, headers.
+- For factual questions, lead with the answer, then add details.
+- For "search mo" or "hanapin mo" type queries — search first, then answer with the results.
+- When you don't have enough info, use the web_search tool to find the answer.
+- Always answer in the user's language (English, Tagalog, Bisaya, etc.) — match their tone.
 
 ## RULES:
-- When you receive search results, answer IMMEDIATELY. Never ask to search again.
-- Answer in the user's language (English, Tagalog, Bisaya, etc.)
-- Be concise but thorough.`;
+- When you receive search results, answer IMMEDIATELY using those results. Never say you can't search — the results are already in context.
+- Never refuse to search. If asked to search, use web_search tool.
+- Be accurate. If search results conflict, mention both sides.
+- For sensitive topics (politics, religion), be neutral and present facts.`;
 
   // Compound models = built-in search, no tools needed
   const COMPOUND_MODELS = ['groq/compound', 'groq/compound-mini'];
@@ -81,6 +90,7 @@
   let isOnline = true;
   let isGenerating = false;
   let isBlocked = false;
+  let lastSearchImages = []; // Images from last search — auto-injected after response
 
   // ============ DOM ============
   const $ = (s) => document.querySelector(s);
@@ -157,6 +167,7 @@
   // Multi-source search: Wikipedia Search + Summary + DuckDuckGo
   async function executeWebSearch(query) {
     const results = [];
+    const searchImages = []; // Collect images from all sources
 
     // Source 1: Wikipedia full-text search (CORS-friendly with origin=*)
     try {
@@ -189,11 +200,52 @@
             image: sData.thumbnail?.source || null,
             source: 'Wikipedia Summary'
           });
+          if (sData.thumbnail?.source) {
+            searchImages.push({ url: sData.thumbnail.source, alt: sData.title || query });
+          }
         }
       }
     } catch (e) { /* silent */ }
 
-    // Source 3: DuckDuckGo Instant Answers (may be empty)
+    // Source 3: Wikipedia search WITH page images (generator=search)
+    try {
+      const wikiImgResp = await fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=5&prop=pageimages|info&inprop=url&piprop=thumbnail&pithumbsize=400&format=json&origin=*`);
+      if (wikiImgResp.ok) {
+        const wikiImgData = await wikiImgResp.json();
+        const pages = wikiImgData.query?.pages || {};
+        Object.values(pages).forEach(p => {
+          const thumb = p.thumbnail?.source;
+          if (thumb) {
+            searchImages.push({ url: thumb, alt: p.title || '' });
+            // Also add as text result if snippet available
+            results.push({
+              title: p.title,
+              snippet: `Wikipedia article: ${p.title}`,
+              url: p.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
+              image: thumb,
+              source: 'Wikipedia'
+            });
+          }
+        });
+      }
+    } catch (e) { /* silent */ }
+
+    // Source 4: Wikimedia Commons — dedicated image search
+    try {
+      const commonsResp = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=4&gsrnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`);
+      if (commonsResp.ok) {
+        const commonsData = await commonsResp.json();
+        const cPages = commonsData.query?.pages || {};
+        Object.values(cPages).forEach(p => {
+          const info = p.imageinfo?.[0];
+          if (info?.thumburl) {
+            searchImages.push({ url: info.thumburl, alt: (p.title || '').replace(/^File:/, '').replace(/\.[a-z]+$/i, '') });
+          }
+        });
+      }
+    } catch (e) { /* silent */ }
+
+    // Source 5: DuckDuckGo Instant Answers (may be empty)
     try {
       const ddgResp = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
       if (ddgResp.ok) {
@@ -206,6 +258,9 @@
             image: ddgData.Image ? (ddgData.Image.startsWith('http') ? ddgData.Image : null) : null,
             source: 'DuckDuckGo'
           });
+          if (ddgData.Image && ddgData.Image.startsWith('http')) {
+            searchImages.push({ url: ddgData.Image, alt: ddgData.Heading || query });
+          }
         }
         // Add related topics
         (ddgData.RelatedTopics || []).forEach(t => {
@@ -230,11 +285,24 @@
       return true;
     });
 
+    // Store images globally for auto-injection
+    lastSearchImages = dedupeImages(searchImages).slice(0, 8);
+
     return JSON.stringify({
       query,
       total: unique.length,
       results: unique.slice(0, 12),
-      note: 'Use these results to answer the user. Include image URLs as ![alt](url). Include YouTube URLs as plain links.'
+      images_found: lastSearchImages.length,
+      note: 'Use these results to answer. Images will be shown automatically below your response.'
+    });
+  }
+
+  function dedupeImages(imgs) {
+    const seenUrls = new Set();
+    return imgs.filter(img => {
+      if (!img.url || seenUrls.has(img.url)) return false;
+      seenUrls.add(img.url);
+      return true;
     });
   }
 
@@ -707,6 +775,7 @@
             addCodeBlockActions(bubbleEl);
             addOutputPanels(bubbleEl, finalResponse);
             addMediaEnhancements(bubbleEl);
+            injectImageGallery(aiMsgEl);
             success = true;
           } else if (!lastError && round >= MAX_ROUNDS) {
             // Fallback — should not happen
@@ -741,7 +810,8 @@
               appendMessage('ai', `⏳ Rate limit hit — waiting ${waitSec}s then retrying...`, false, true);
               await new Promise(r => setTimeout(r, waitSec * 1000));
               removeTempMessages();
-              attempt--; // Retry same attempt
+              // Don't consume another key attempt — retry same key after rate limit
+              attempt--;
               continue;
             }
 
@@ -790,6 +860,7 @@
             addCodeBlockActions(bubbleEl);
             addOutputPanels(bubbleEl, fullResponse);
             addMediaEnhancements(bubbleEl);
+            injectImageGallery(aiMsgEl);
             success = true;
           }
         }
@@ -833,6 +904,45 @@
         embedDiv.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
       });
     });
+  }
+
+  // Auto-inject image gallery below AI message when search found images
+  function injectImageGallery(parentRow) {
+    if (!lastSearchImages || lastSearchImages.length === 0) return;
+
+    const gallery = document.createElement('div');
+    gallery.className = 'search-gallery';
+
+    const header = document.createElement('div');
+    header.className = 'gallery-header';
+    header.innerHTML = `🖼️ Related Images <span class="gallery-count">${lastSearchImages.length}</span>`;
+    gallery.appendChild(header);
+
+    const grid = document.createElement('div');
+    grid.className = 'gallery-grid';
+
+    lastSearchImages.forEach(img => {
+      const card = document.createElement('div');
+      card.className = 'gallery-card';
+      card.innerHTML = `<a href="${img.url}" target="_blank" rel="noopener"><img src="${img.url}" alt="${escapeHtml(img.alt)}" loading="lazy" onerror="this.closest('.gallery-card').style.display='none'">${img.alt ? `<span class="gallery-caption">${escapeHtml(img.alt)}</span>` : ''}</a>`;
+      grid.appendChild(card);
+    });
+
+    gallery.appendChild(grid);
+
+    // Insert gallery AFTER the bubble inside the message row
+    const bubble = parentRow.querySelector('.message-bubble');
+    if (bubble) {
+      bubble.parentNode.insertBefore(gallery, bubble.nextSibling);
+    }
+
+    // Wire up click to open images
+    grid.querySelectorAll('.gallery-card img').forEach(img => {
+      img.addEventListener('click', () => { window.open(img.src, '_blank', 'noopener'); });
+    });
+
+    // Clear images for next response
+    lastSearchImages = [];
   }
 
   // ============ RENDER MESSAGE ============
