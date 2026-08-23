@@ -53,7 +53,7 @@
   const CURRENT_USER_ID = getUserId();
 
   // ============ STATE ============
-  let currentModel = localStorage.getItem('dvc_model') || 'llama-3.3-70b-versatile';
+  let currentModel = localStorage.getItem('dvc_model') || 'openai/gpt-oss-20b';
   let currentKeyIndex = 0;
   let failedKeys = new Set();
   let chats = JSON.parse(localStorage.getItem('dvc_chats') || '[]');
