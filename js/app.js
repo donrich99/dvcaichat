@@ -1,5 +1,5 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v6.2
+   DVC AI CHATBOT — app.js v6.4
    FULLY TESTED & FIXED — All 8 bugs resolved
    Tool calling + compound built-in search
    Wikipedia Search + Qwen thinking stripped
