@@ -81,7 +81,16 @@
   // ============ API KEY MANAGEMENT ============
   function getKeys() {
     try {
-      return JSON.parse(localStorage.getItem('dvc_api_keys') || '[]');
+      let keys = JSON.parse(localStorage.getItem('dvc_api_keys') || '[]');
+      // Auto-migrate old key storage
+      if (keys.length === 0) {
+        const oldKeys = JSON.parse(localStorage.getItem('dvc_groq_keys') || '[]');
+        if (oldKeys.length > 0) {
+          keys = oldKeys;
+          setKeys(keys);
+        }
+      }
+      return keys;
     } catch { return []; }
   }
 
