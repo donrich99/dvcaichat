@@ -377,6 +377,55 @@
     });
   }
 
+  // ============ ABOUT MODAL ============
+  function setupAbout() {
+    const aboutBtn = $('#aboutBtn');
+    const aboutModal = $('#aboutModal');
+    const aboutClose = $('#aboutClose');
+
+    if (!aboutBtn || !aboutModal) return;
+
+    aboutBtn.addEventListener('click', () => {
+      aboutModal.style.display = 'flex';
+      overlay.classList.add('active');
+    });
+
+    aboutClose.addEventListener('click', () => {
+      aboutModal.style.display = 'none';
+      overlay.classList.remove('active');
+    });
+
+    aboutModal.addEventListener('click', (e) => {
+      if (e.target === aboutModal) {
+        aboutModal.style.display = 'none';
+        overlay.classList.remove('active');
+      }
+    });
+
+    // Copy donation buttons
+    document.querySelectorAll('.copy-donation-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.getAttribute('data-copy-text');
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = '✅ Copied!';
+          setTimeout(() => btn.textContent = orig, 2000);
+        }).catch(() => {
+          // fallback
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          const orig = btn.textContent;
+          btn.textContent = '✅ Copied!';
+          setTimeout(() => btn.textContent = orig, 2000);
+        });
+      });
+    });
+  }
+
   // ============ EVENT LISTENERS ============
   function setupEventListeners() {
     sendBtn.addEventListener('click', sendMessage);
@@ -398,7 +447,16 @@
     });
 
     $('#menuToggle').addEventListener('click', toggleSidebar);
-    $('#overlay').addEventListener('click', toggleSidebar);
+    $('#overlay').addEventListener('click', () => {
+      // Close any open modal first
+      const aboutModal = $('#aboutModal');
+      if (aboutModal && aboutModal.style.display === 'flex') {
+        aboutModal.style.display = 'none';
+        overlay.classList.remove('active');
+        return;
+      }
+      toggleSidebar();
+    });
 
     $('#clearAllBtn').addEventListener('click', () => {
       if (confirm('Delete ALL chats? This cannot be undone.')) {
@@ -422,6 +480,7 @@
     });
 
     setupSettings();
+    setupAbout();
     setupUploadSystem();
   }
 

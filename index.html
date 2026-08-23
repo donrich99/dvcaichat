@@ -88,6 +88,7 @@
     </div>
     <button class="settings-btn" id="settingsBtn">⚙️ API Key Settings</button>
     <button class="clear-all-btn" id="clearAllBtn">🗑️ Clear All Chats</button>
+    <button class="about-btn" id="aboutBtn">👤 About the Creator</button>
     <div class="footer-info">
       <span class="powered-by">⚡ Powered by promode × @dvc</span>
       <span class="owner-tag">© @dvc 2026</span>
@@ -207,6 +208,87 @@
 </div>
 
 <div class="overlay" id="overlay"></div>
+
+<!-- ============ ABOUT MODAL ============ -->
+<div class="modal-overlay" id="aboutModal" style="display:none;">
+  <div class="about-card">
+    <div class="modal-header about-header">
+      <h2>About the Creator</h2>
+      <button class="modal-close" id="aboutClose">&times;</button>
+    </div>
+    <div class="modal-body about-body">
+      <!-- Hero section -->
+      <div class="about-hero">
+        <div class="about-avatar">👑</div>
+        <h1 class="about-name">DVC</h1>
+        <p class="about-title">The Creator of DVC AI</p>
+        <div class="about-divider"></div>
+      </div>
+
+      <!-- Heartfelt message -->
+      <div class="about-message">
+        <p class="about-greeting">To every user who believes in this dream,</p>
+
+        <p>From the bottom of my heart, I want to thank each and every one of you for taking the time to visit, use, and trust DVC AI. This project was born out of a genuine passion for technology and a deep desire to make artificial intelligence accessible to everyone — students, workers, entrepreneurs, dreamers, and anyone who needs a reliable AI assistant by their side, day and night.</p>
+
+        <p>I am not a large corporation backed by millions in funding. I am just an ordinary person with an extraordinary dream — to level the playing field so that everyone, regardless of their background, financial status, or location, can harness the power of AI. Every single line of code in this chatbot was written with care, sleepless nights, and a heart that never stopped believing that technology should serve people, not the other way around.</p>
+
+        <p><strong>DVC AI will always be free to use — today, tomorrow, and forever.</strong> I made a personal commitment to myself and to all of you that no one will ever be charged just to talk to an AI that actually helps them. This is not a business. This is a mission.</p>
+
+        <p>I am not asking for money. I am not asking for anything in return. However, if you ever feel moved — if this tool has helped you write an essay, solve a problem, learn something new, or simply made your day a little easier — and you wish to support the continued operation of this project through a voluntary donation, I would be truly grateful. Every peso, every dollar, no matter how small, goes directly toward keeping the servers running, maintaining the system, and ensuring that DVC AI stays alive for everyone. But please know this: <em>your kindness is never an obligation.</em> Your support, your gratitude, and your trust are more than enough.</p>
+
+        <p>I also want to express my deepest humility. I know that this project is far from perfect. I know there are bugs, limitations, and things that could be improved. But I promise you this — I will never stop building. I will never stop learning. And I will never stop listening to your feedback, because this project does not belong to me alone. It belongs to every single person who has ever believed that AI should be free for all.</p>
+
+        <p>Thank you for being part of this journey. Thank you for believing in something bigger than any one of us. And thank you for proving, time and time again, that generosity, kindness, and community still matter in this world.</p>
+
+        <p class="about-closing"><strong>With all my love, gratitude, and humility,</strong></p>
+      </div>
+
+      <!-- Donation section -->
+      <div class="donation-section">
+        <h3>💝 Support the Project (Entirely Voluntary)</h3>
+        <p class="donation-note">Any amount is a tremendous help. Thank you from the bottom of my heart!</p>
+
+        <div class="donation-cards">
+          <div class="donation-card">
+            <div class="dc-icon">📱</div>
+            <div class="dc-label">GCash</div>
+            <div class="dc-value" data-copy="09945160282">0994 516 0282</div>
+            <button class="copy-donation-btn" data-copy-text="09945160282">📋 Copy</button>
+          </div>
+
+          <div class="donation-card">
+            <div class="dc-icon">📧</div>
+            <div class="dc-label">PayPal</div>
+            <div class="dc-value" data-copy="poorvallejos@gmail.com">poorvallejos@gmail.com</div>
+            <button class="copy-donation-btn" data-copy-text="poorvallejos@gmail.com">📋 Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Connect section -->
+      <div class="connect-section">
+        <h3>🌐 Connect With Me</h3>
+        <a href="https://www.facebook.com/hcirnod.vales.2025"
+           target="_blank"
+           rel="noopener noreferrer"
+           class="facebook-link">
+          📘 Follow me on Facebook
+          <span class="fb-handle">@hcirnod.vales.2025</span>
+        </a>
+      </div>
+
+      <!-- Footer -->
+      <div class="about-footer">
+        <p class="about-quote">"Scarcity is never an excuse to stop giving."</p>
+        <p class="about-signature">— DVC, Creator of DVC AI</p>
+        <div class="about-powered">
+          ⚡ Built with love by promode × @dvc · © @dvc 2026
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ============ IMAGE PREVIEW MODAL ============ -->
 <div class="modal-overlay" id="imagePreviewModal" style="display:none;">
