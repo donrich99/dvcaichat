@@ -1104,118 +1104,162 @@
     });
   }
 
-  // ============ INLINE VIDEO PLAYER WITH PROXY FALLBACK ============
-  // Plays video INSIDE the chatbot. No redirects.
-  // Chain: YouTube embed → Piped proxy → Invidious proxy → error
-  const PROXY_EMBEDS = [
-    { name: 'Piped', build: id => `https://piped.video/embed/${id}?autoplay=1` },
-    { name: 'Piped KR', build: id => `https://piped.kavin.rocks/embed/${id}?autoplay=1` },
-    { name: 'Invidious', build: id => `https://invidious.nerdvpn.de/embed/${id}?autoplay=1&local=true` },
+  // ============ INLINE VIDEO PLAYER — NATIVE <video> + PROXY API ============
+  // Step 1: Try YouTube embed (works for most videos)
+  // Step 2: Fetch direct stream URL from Piped API → play via <video> tag
+  // All playback happens INSIDE the chatbot. Zero redirects.
+
+  const PIPED_APIS = [
+    'https://api.piped.private.coffee',
+    'https://pipedapi.adminforge.de',
   ];
 
-  function playVideoInline(container, videoId, attempt) {
-    attempt = attempt || 0;
+  function playVideoInline(container, videoId) {
+    // Show loading state
+    container.innerHTML = `
+      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+        <div style="text-align:center;color:#aaa;">
+          <div class="dvc-spinner" style="margin:0 auto 12px;width:36px;height:36px;border:3px solid #333;border-top-color:#f00;border-radius:50%;animation:spin .8s linear infinite;"></div>
+          <p style="font-size:13px;margin:0;">Loading video...</p>
+        </div>
+      </div>`;
 
-    if (attempt === 0) {
-      // Step 1: Official YouTube embed
-      container.innerHTML = `
-        <div style="position:relative;width:100%;height:100%;background:#000;border-radius:12px;overflow:hidden;">
-          <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1" frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
-        </div>`;
-      // If YouTube doesn't confirm playback in 4s → try proxy
-      waitForYouTubeConfirm(container, videoId, () => playVideoInline(container, videoId, 1), 4000);
-      return;
-    }
-
-    if (attempt <= PROXY_EMBEDS.length) {
-      // Steps 2-4: Proxy embeds (bypass embedding restrictions)
-      const proxy = PROXY_EMBEDS[attempt - 1];
-      container.innerHTML = `
-        <div style="position:relative;width:100%;height:100%;background:#000;border-radius:12px;overflow:hidden;">
-          <iframe src="${proxy.build(videoId)}" frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
-        </div>`;
-      // Give proxy time to load; if iframe errors out or stays blank → next proxy
-      setTimeout(() => {
-        const frame = container.querySelector('iframe');
-        if (!frame || !frame.isConnected) return;
-        // Heuristic: proxies load fast. If still no interaction possible after 6s, move on.
-        // But don't auto-skip — user may be watching. Only skip on explicit failure signal.
-        listenForProxyFail(frame, () => {
-          if (attempt < PROXY_EMBEDS.length) {
-            playVideoInline(container, videoId, attempt + 1);
-          } else {
-            showVideoError(container, videoId);
-          }
-        }, 6000);
-      }, 500);
-      return;
-    }
-
-    showVideoError(container, videoId);
+    // Step 1: Try YouTube embed first
+    tryYouTubeEmbed(container, videoId, (success) => {
+      if (!success) {
+        // Step 2: Fetch direct stream URL via Piped API
+        fetchStreamAndPlay(container, videoId);
+      }
+    });
   }
 
-  function waitForYouTubeConfirm(container, videoId, onFailure, timeoutMs) {
-    let confirmed = false;
-    const timer = setTimeout(() => {
-      window.removeEventListener('message', msgHandler);
-      if (!confirmed) onFailure();
-    }, timeoutMs);
+  function tryYouTubeEmbed(container, videoId, onDone) {
+    let settled = false;
 
-    function msgHandler(e) {
+    container.innerHTML = `
+      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;">
+        <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1" frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen style="width:100%;height:100%;min-height:220px;position:absolute;inset:0;"></iframe>
+      </div>`;
+
+    function done(success) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', handler);
+      onDone(success);
+    }
+
+    // If YouTube reports playback, it works
+    function handler(e) {
       try {
         const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!d || !d.event) return;
-        // YouTube confirms playback is starting
-        if (d.event === 'infoDelivery' || d.event === 'onStateChange' && d.info === 1) {
-          confirmed = true;
-          clearTimeout(timer);
-          window.removeEventListener('message', msgHandler);
+        if (d.event === 'infoDelivery' || (d.event === 'onStateChange' && d.info === 1)) {
+          done(true);
         }
-        // YouTube explicitly reports embed error (101/150 = embedding disabled)
+        // Embedding disabled (error codes 101, 150)
         if (d.event === 'onError') {
-          confirmed = true; // stop waiting
-          clearTimeout(timer);
-          window.removeEventListener('message', msgHandler);
-          onFailure(); // immediately go to proxy
+          done(false);
         }
       } catch(err) {}
     }
-    window.addEventListener('message', msgHandler);
+
+    window.addEventListener('message', handler);
+    // Timeout: if YouTube doesn't confirm in 3.5s, assume failure
+    const timer = setTimeout(() => done(false), 3500);
   }
 
-  function listenForProxyFail(iframeEl, onFail, timeoutMs) {
-    // Detect if proxy iframe was blocked/refused (X-Frame-Options etc.)
-    // Browsers fire 'load' even for refused frames sometimes, so use timing heuristic:
-    // if after N seconds the iframe's contentWindow is inaccessible AND page reports nothing,
-    // we can't reliably detect — so we rely on onError postMessage where available,
-    // plus a manual "Next source" button the user can tap.
-    const wrapper = iframeEl.parentElement;
-    const switchBtn = document.createElement('button');
-    switchBtn.textContent = '⇄ Try another source';
-    switchBtn.style.cssText = 'position:absolute;top:8px;left:8px;z-index:10;background:rgba(0,0,0,0.7);color:#fff;border:1px solid rgba(255,255,255,0.25);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(4px);font-family:inherit;';
-    switchBtn.addEventListener('click', () => {
-      const idx = Array.from(document.querySelectorAll('.video-embed')).indexOf(wrapper.closest('.video-embed'));
-      const vid = wrapper.closest('.video-embed').dataset.videoId;
-      // find current attempt by checking current src
-      let curAttempt = 1;
-      const src = iframeEl.src || '';
-      PROXY_EMBEDS.forEach((p, i) => { if (src.includes(p.name === 'Invidious' ? 'nerdvpn' : p.name.toLowerCase().split(' ')[0])) curAttempt = i + 2; });
-      playVideoInline(wrapper.closest('.video-embed'), vid, curAttempt < PROXY_EMBEDS.length + 1 ? curAttempt + 1 : 0);
-    });
-    wrapper.appendChild(switchBtn);
+  async function fetchStreamAndPlay(container, videoId) {
+    let streamUrl = null;
+
+    // Try each Piped API instance
+    for (const apiBase of PIPED_APIS) {
+      try {
+        const resp = await fetch(`${apiBase}/streams/${videoId}`, {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (!resp.ok) continue;
+        const data = await resp.json();
+        // Find a combined (video+audio) stream — prefer mp4
+        const streams = (data.videoStreams || [])
+          .filter(s => !s.videoOnly && s.mimeType && s.mimeType.includes('video/mp4'))
+          .sort((a, b) => {
+            // Prefer 360p-720p for mobile
+            const qa = parseInt(a.quality) || 0;
+            const qb = parseInt(b.quality) || 0;
+            return Math.abs(qa - 480) - Math.abs(qb - 480);
+          });
+        if (streams.length > 0 && streams[0].url) {
+          streamUrl = streams[0].url;
+          break;
+        }
+      } catch(err) {
+        continue;
+      }
+    }
+
+    if (!streamUrl) {
+      // Try Invidious API as last resort
+      try {
+        const resp = await fetch(`https://invidious.nerdvpn.de/api/v1/videos/${videoId}?fields=formatStreams`, {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const fmts = (data.formatStreams || []).filter(s => s.url && s.type && s.type.includes('video/mp4'));
+          if (fmts.length > 0) {
+            streamUrl = fmts[0].url;
+          }
+        }
+      } catch(err) {}
+    }
+
+    if (streamUrl) {
+      playDirectStream(container, streamUrl, videoId);
+    } else {
+      showVideoError(container, videoId);
+    }
   }
+
+  function playDirectStream(container, streamUrl, videoId) {
+    // Get thumbnail for poster
+    const posterUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+
+    container.innerHTML = `
+      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;">
+        <video controls autoplay playsinline preload="auto" poster="${posterUrl}"
+          style="width:100%;height:100%;min-height:220px;object-fit:contain;background:#000;display:block;"
+          onerror="window._dvcVideoError(this, '${videoId}', '${streamUrl}')">
+          <source src="${streamUrl}" type="video/mp4">
+        </video>
+      </div>`;
+  }
+
+  // Handle video source error — try next quality or show error
+  window._dvcVideoError = function(videoEl, videoId, failedUrl) {
+    // Remove the failed source and retry without poster
+    videoEl.onerror = null; // prevent loop
+    // Try playing without poster/source tag
+    videoEl.removeAttribute('poster');
+    videoEl.src = failedUrl;
+    videoEl.load();
+    videoEl.play().catch(() => {
+      // Complete failure — show error
+      const container = videoEl.closest('.video-embed');
+      if (container) showVideoError(container, videoId);
+    });
+  };
 
   function showVideoError(container, videoId) {
     container.innerHTML = `
       <div style="position:relative;width:100%;height:100%;min-height:200px;background:#111;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
         <img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.3;" onerror="this.style.display='none'">
         <div style="position:relative;z-index:1;text-align:center;">
-          <p style="color:#fff;margin:0 0 8px;font-size:14px;">All sources unavailable for this video</p>
-          <button onclick="window._dvcPlayVideo(this.closest('[data-video-id]'), this.closest('[data-video-id]').dataset.videoId, 0)" style="display:inline-flex;align-items:center;gap:6px;background:#f00;color:#fff;padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;border:none;cursor:pointer;">↻ Retry</button>
+          <p style="color:#fff;margin:0 0 8px;font-size:14px;">Unable to load this video</p>
+          <button onclick="window._dvcPlayVideo(this.closest('[data-video-id]'), this.closest('[data-video-id]').dataset.videoId)" style="display:inline-flex;align-items:center;gap:6px;background:#f00;color:#fff;padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;border:none;cursor:pointer;margin-right:8px;">↻ Retry</button>
+          <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#333;color:#fff;padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;">▶ YouTube ↗</a>
         </div>
       </div>`;
   }

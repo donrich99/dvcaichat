@@ -713,6 +713,10 @@ body {
   30% { transform: translateY(-6px); opacity: 1; }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .error-bubble {
   background: rgba(218, 54, 51, 0.1) !important;
   border-color: var(--danger) !important;
