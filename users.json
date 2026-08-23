@@ -1,1 +1,11 @@
-{"users":[],"total":0,"last_updated":"2026-08-23T07:20:00Z","updated_by":"@dvc via Telegram Bot"}
+{
+  "users": [],
+  "total": 0,
+  "last_updated": "2026-08-23T12:02:07Z",
+  "updated_by": "@dvc via Telegram Bot",
+  "broadcast": {
+    "message": "hi",
+    "timestamp": "2026-08-23T12:02:07Z",
+    "active": true
+  }
+}
