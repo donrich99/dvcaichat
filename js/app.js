@@ -599,7 +599,7 @@
     isGenerating = true;
     updateStatusDot('thinking');
 
-    const historyMessages = chat.messages.slice(-20).map(m => ({
+    const historyMessages = chat.messages.slice(-10).map(m => ({
       role: m.role,
       content: typeof m.content === 'string' ? m.content : String(m.content || '')
     }));
@@ -636,7 +636,7 @@
               body: JSON.stringify({
                 model: resolveModel(currentModel),
                 messages: localMessages,
-                max_tokens: 4096,
+                max_tokens: 2048,
                 temperature: 0.7,
                 top_p: 0.9,
                 stream: false,
@@ -649,7 +649,21 @@
               let apiErrMsg = '';
               try { const errData = await response.json(); apiErrMsg = errData?.error?.message || 'HTTP ' + response.status; } catch { apiErrMsg = 'HTTP ' + response.status; }
               console.error('API Error:', apiErrMsg);
-              if (response.status === 429 || response.status === 500) { markKeyFailed(); lastError = apiErrMsg; break; }
+
+              // Rate limit (429) — auto-retry after wait time
+              if (response.status === 429) {
+                const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
+                const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
+                if (round < MAX_ROUNDS) {
+                  removeTempMessages();
+                  appendMessage('ai', `⏳ Rate limit hit — waiting ${waitSec}s then retrying...`, false, true);
+                  await new Promise(r => setTimeout(r, waitSec * 1000));
+                  removeTempMessages();
+                  round--; // Retry same round
+                  continue;
+                }
+              }
+              if (response.status === 500) { markKeyFailed(); }
               lastError = apiErrMsg;
               break;
             }
@@ -708,7 +722,7 @@
             body: JSON.stringify({
               model: resolveModel(currentModel),
               messages: apiMessages,
-              max_tokens: 4096,
+              max_tokens: 2048,
               temperature: 0.7,
               top_p: 0.9,
               stream: true
@@ -719,6 +733,18 @@
             let apiErrMsg = '';
             try { const errData = await response.json(); apiErrMsg = errData?.error?.message || 'HTTP ' + response.status; } catch { apiErrMsg = 'HTTP ' + response.status; }
             console.error('API Error:', apiErrMsg);
+
+            if (response.status === 429) {
+              const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
+              const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
+              removeTempMessages();
+              appendMessage('ai', `⏳ Rate limit hit — waiting ${waitSec}s then retrying...`, false, true);
+              await new Promise(r => setTimeout(r, waitSec * 1000));
+              removeTempMessages();
+              attempt--; // Retry same attempt
+              continue;
+            }
+
             markKeyFailed();
             lastError = apiErrMsg;
             continue;
