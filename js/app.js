@@ -19,21 +19,21 @@
   const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers.
 
 ## YOUR CAPABILITIES:
-1. **INTERNET SEARCH** — You have a web_search tool. When a user asks about current events, news, facts you're unsure about, weather, sports scores, stock prices, or anything that might need up-to-date info — USE THE web_search TOOL FIRST before answering. Always cite your sources with URLs.
-2. **IMAGES** — When search results include image URLs, include them in your response using markdown format: ![description](image_url). They will be displayed as clickable image cards in chat.
-3. **VIDEOS** — When you find YouTube video URLs in search results, include them as plain URLs (https://www.youtube.com/watch?v=VIDEO_ID). They will automatically render as playable embedded videos in the chat.
+1. **INTERNET SEARCH** — You have a web_search tool. Call web_search ONCE with a broad query, then STOP and give your answer. NEVER search more than once per question.
+2. **IMAGES** — When results include image URLs, include them using markdown: ![description](image_url).
+3. **VIDEOS** — When you find YouTube URLs, include them as plain URLs (https://www.youtube.com/watch?v=VIDEO_ID).
 4. **CODE** — Write code in proper markdown code blocks with language tags.
 5. **GENERAL KNOWLEDGE** — Answer any question on any topic.
 
-## SEARCH GUIDELINES:
-- For questions about CURRENT events (today's news, recent developments) → ALWAYS use web_search
-- For factual questions where accuracy matters → use web_search to verify
-- For general knowledge you're confident about → answer directly without searching
-- If user asks for "latest", "recent", "news", "today" → ALWAYS use web_search
-- Include relevant image URLs from results using markdown syntax
-- Include YouTube URLs when relevant so users can watch videos
-
-Be concise but thorough. Use markdown formatting when helpful.`;
+## CRITICAL RULES — READ CAREFULLY:
+- Call web_search at MOST ONCE per user question. Then STOP searching and write your answer.
+- NEVER call web_search more than once for the same question. Never loop.
+- When search results come back, IMMEDIATELY write your final answer from those results.
+- For general knowledge you already know — answer directly WITHOUT searching.
+- For "latest/recent/news/today" questions — search ONCE, then answer.
+- If search results seem limited, still give the best answer you can.
+- Include YouTube URLs when relevant so users can watch embedded videos.
+- Be concise but thorough. Use markdown formatting when helpful.`;
 
   // Obfuscated model ID mapping (display names → real API IDs)
   const MODEL_MAP = {
@@ -327,6 +327,10 @@ Be concise but thorough. Use markdown formatting when helpful.`;
     setupKeyboardFix();
     renderChatHistory();
 
+    // Show user badge
+    const userBadge = $('#userBadge');
+    if (userBadge) userBadge.textContent = `🆔 ${CURRENT_USER_ID}`;
+
     isBlocked = await checkBlockStatus();
     if (isBlocked) showBlockScreen();
 
@@ -344,22 +348,13 @@ Be concise but thorough. Use markdown formatting when helpful.`;
     });
     userInput.addEventListener('input', autoResize);
 
-    settingsBtn.addEventListener('click', () => settingsModal.style.display = 'flex');
+    settingsBtn.addEventListener('click', () => {
+      settingsModal.style.display = 'flex';
+      refreshSavedKeysList();
+    });
     settingsClose.addEventListener('click', () => settingsModal.style.display = 'none');
     settingsModal.addEventListener('click', (e) => {
       if (e.target === settingsModal) settingsModal.style.display = 'none';
-    });
-
-    $('#saveKeys').addEventListener('click', () => {
-      const val = $('#keysInput').value.trim();
-      const keys = val.split('\n').map(k => k.trim()).filter(k => k.length > 10);
-      if (keys.length > 0) {
-        localStorage.setItem('dvc_keys', JSON.stringify(keys));
-        failedKeys.clear();
-        currentKeyIndex = 0;
-        updateKeyStatus();
-        settingsModal.style.display = 'none';
-      }
     });
 
     modelSelect.addEventListener('change', () => {
@@ -369,7 +364,7 @@ Be concise but thorough. Use markdown formatting when helpful.`;
     modelSelect.value = currentModel;
 
     $('#newChatBtn').addEventListener('click', createNewChat);
-    $('#menuBtn').addEventListener('click', toggleSidebar);
+    $('#menuToggle').addEventListener('click', toggleSidebar);
     $('#overlay').addEventListener('click', toggleSidebar);
     $('#clearAllBtn').addEventListener('click', () => {
       if (confirm('Delete ALL chats?')) {
@@ -394,6 +389,113 @@ Be concise but thorough. Use markdown formatting when helpful.`;
 
     setupSettings();
     setupAbout();
+  }
+
+  // ============ SETTINGS MODAL ============
+  function setupSettings() {
+    const settingsSaveKeys = $('#settingsSaveKeys');
+    const settingsClearKeys = $('#settingsClearKeys');
+    const settingsNewKey = $('#settingsNewKey');
+    const settingsMultiKeys = $('#settingsMultiKeys');
+    const keyCountDisplay = $('#keyCountDisplay');
+
+    if (keyCountDisplay) keyCountDisplay.textContent = getKeys().length;
+
+    // Save keys (single or multi-line)
+    if (settingsSaveKeys) {
+      settingsSaveKeys.addEventListener('click', () => {
+        let newKeys = [];
+        // Try multi-line first
+        if (settingsMultiKeys && settingsMultiKeys.value.trim()) {
+          newKeys = settingsMultiKeys.value.trim().split('\n').map(k => k.trim()).filter(k => k.length > 10);
+        }
+        // Also check single input
+        if (settingsNewKey && settingsNewKey.value.trim()) {
+          const singleKey = settingsNewKey.value.trim();
+          if (singleKey.length > 10 && !newKeys.includes(singleKey)) newKeys.push(singleKey);
+        }
+        if (newKeys.length > 0) {
+          // Merge with existing keys (no duplicates)
+          const existing = getKeys();
+          const merged = [...existing];
+          newKeys.forEach(k => { if (!merged.includes(k)) merged.push(k); });
+          localStorage.setItem('dvc_keys', JSON.stringify(merged));
+          failedKeys.clear();
+          currentKeyIndex = 0;
+          updateKeyStatus();
+          if (keyCountDisplay) keyCountDisplay.textContent = merged.length;
+          if (settingsNewKey) settingsNewKey.value = '';
+          if (settingsMultiKeys) settingsMultiKeys.value = '';
+          refreshSavedKeysList();
+          settingsSaveKeys.textContent = '✅ Saved!';
+          setTimeout(() => { settingsSaveKeys.textContent = '💾 Save Keys'; }, 2000);
+        }
+      });
+    }
+
+    // Clear all keys
+    if (settingsClearKeys) {
+      settingsClearKeys.addEventListener('click', () => {
+        if (confirm('Remove ALL saved keys? Default keys will be used.')) {
+          localStorage.removeItem('dvc_keys');
+          failedKeys.clear();
+          currentKeyIndex = 0;
+          updateKeyStatus();
+          if (keyCountDisplay) keyCountDisplay.textContent = getKeys().length;
+          refreshSavedKeysList();
+        }
+      });
+    }
+  }
+
+  function refreshSavedKeysList() {
+    const listEl = $('#savedKeysList');
+    const keyCountDisplay = $('#keyCountDisplay');
+    if (!listEl) return;
+    const keys = getKeys();
+    if (keyCountDisplay) keyCountDisplay.textContent = keys.length;
+    listEl.innerHTML = '';
+    keys.forEach((k, i) => {
+      const item = document.createElement('div');
+      item.className = 'saved-key-item';
+      item.innerHTML = `<span>🔑 Key ${i + 1}: <code>${k.substring(0, 8)}...${k.slice(-4)}</code></span>`;
+      listEl.appendChild(item);
+    });
+  }
+
+  // ============ ABOUT MODAL ============
+  function setupAbout() {
+    const aboutBtn = $('#aboutBtn');
+    const aboutModal = $('#aboutModal');
+    const aboutClose = $('#aboutClose');
+
+    if (aboutBtn && aboutModal) {
+      aboutBtn.addEventListener('click', () => {
+        aboutModal.style.display = 'flex';
+        toggleSidebar(); // Close sidebar
+      });
+    }
+    if (aboutClose && aboutModal) {
+      aboutClose.addEventListener('click', () => { aboutModal.style.display = 'none'; });
+    }
+    if (aboutModal) {
+      aboutModal.addEventListener('click', (e) => {
+        if (e.target === aboutModal) aboutModal.style.display = 'none';
+      });
+    }
+
+    // Donation copy buttons
+    document.querySelectorAll('.copy-donation-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.copyText;
+        if (text) {
+          navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+          }).catch(() => {});
+        }
+      });
+    });
   }
 
   // ============ AUTO RESIZE ============
@@ -546,10 +648,10 @@ Be concise but thorough. Use markdown formatting when helpful.`;
         const key = getNextKey();
         if (!key) break;
 
-        // ReAct loop: allow up to 5 tool-call rounds
+        // ReAct loop: max 3 tool-call rounds, then FORCED final answer
         let finalResponse = '';
         let round = 0;
-        const MAX_ROUNDS = 5;
+        const MAX_ROUNDS = 3;
 
         while (round < MAX_ROUNDS) {
           round++;
@@ -567,7 +669,7 @@ Be concise but thorough. Use markdown formatting when helpful.`;
               temperature: 0.7,
               top_p: 0.9,
               stream: false, // Non-streaming needed for reliable tool calling
-              tools: SEARCH_TOOLS,
+              tools: round < MAX_ROUNDS ? SEARCH_TOOLS : undefined, // NO tools on last round — forces text answer
               tool_choice: 'auto'
             })
           });
@@ -588,8 +690,8 @@ Be concise but thorough. Use markdown formatting when helpful.`;
           const choice = data.choices?.[0];
           const msg = choice?.message;
 
-          // Check if AI wants to call tools
-          if (msg?.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+          // Check if AI wants to call tools AND we have rounds left
+          if (msg?.tool_calls && Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0 && round < MAX_ROUNDS) {
             // Add assistant's tool_call message to history
             apiMessages.push({
               role: 'assistant',
@@ -600,11 +702,44 @@ Be concise but thorough. Use markdown formatting when helpful.`;
             // Execute each tool call
             const toolResponses = await handleToolCalls(msg.tool_calls);
             apiMessages.push(...toolResponses);
+
+            // Force the AI to answer NOW on last round — no more searching
+            if (round >= MAX_ROUNDS - 1) {
+              apiMessages.push({
+                role: 'user',
+                content: '[SYSTEM] Search complete. You MUST now give your final answer using ONLY the search results above. Do NOT use any more tools. Answer the user directly in their language.'
+              });
+            }
             continue; // Loop again for final response
 
-          } else {
-            // Final text response
-            finalResponse = msg?.content || '';
+          } else if (msg?.content) {
+            // Final text response (or AI gave content along with tool calls)
+            finalResponse = msg.content;
+            break;
+
+          } else if (round >= MAX_ROUNDS) {
+            // Exhausted rounds with no text — force answer WITHOUT tools
+            const forceResp = await fetch(API_BASE, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${key}`
+              },
+              body: JSON.stringify({
+                model: resolveModel(currentModel),
+                messages: [...apiMessages, {
+                  role: 'user',
+                  content: '[SYSTEM] No more searches allowed. Give your best final answer NOW based on what you found. Be helpful and direct.'
+                }],
+                max_tokens: 2048,
+                temperature: 0.5,
+                stream: false
+              })
+            });
+            if (forceResp.ok) {
+              const fd = await forceResp.json();
+              finalResponse = fd.choices?.[0]?.message?.content || '';
+            }
             break;
           }
         }
