@@ -1,0 +1,23 @@
+name: Test Groq Models
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List Models
+        env:
+          GROQ_KEY: ${{ secrets.TELEGRAM_GROQ_KEY }}
+        run: |
+          curl -s https://api.groq.com/openai/v1/models \
+            -H "Authorization: Bearer $GROQ_KEY" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+if 'data' in d:
+    print('=== AVAILABLE MODELS ===')
+    for m in sorted(d['data'], key=lambda x: x['id']):
+        print(f\"  • {m['id']}\")
+else:
+    print(json.dumps(d, indent=2))
+"
