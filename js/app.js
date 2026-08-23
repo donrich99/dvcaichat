@@ -9,7 +9,7 @@
 
   // ============ CONFIG ============
   const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const REPO_BASE = 'https://donpoor99.github.io/dvcaichat';
+  const REPO_BASE = 'https://donrich99.github.io/dvcaichat';
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
 
