@@ -783,6 +783,8 @@
     } else {
       messagesEl.innerHTML = '';
       welcomeScreen.style.display = 'none';
+      const mh = $('#modelHint');
+      if (mh) mh.style.display = 'none';
       chat.messages.forEach(msg => appendMessage(msg.role, msg.content, false));
       scrollToBottom();
     }
@@ -812,6 +814,9 @@
     messagesEl.innerHTML = '';
     messagesEl.appendChild(welcomeScreen);
     welcomeScreen.style.display = 'block';
+    // Restore model hint on new chat
+    const mh = $('#modelHint');
+    if (mh) mh.style.display = 'flex';
   }
 
   // ============ AUTO-REMOVE TEMP MESSAGES ============
@@ -846,6 +851,8 @@
     if (!chat) return;
 
     welcomeScreen.style.display = 'none';
+    const modelHint = $('#modelHint');
+    if (modelHint) modelHint.style.display = 'none';
     messagesEl.innerHTML = '';
 
     chat.messages.push({ role: 'user', content: text });
