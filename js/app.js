@@ -105,8 +105,9 @@
   const settingsClose = $('#settingsClose');
 
   // ============ API KEY MANAGEMENT ============
-  const _k1 = ['gsk_', 'O6BI', 'jknw', 'fnf7', 'Rpsw', '86tx', 'WGdy', 'b3FY', 'vdD3', 'uT3V', 'HEnn', 'x5QG', 'F6v9', 'UbjP'];
-  const _k2 = ['gsk_', 'IGGz', 'XDqd', 'iYvo', 'IIsL', '4awf', 'WGdy', 'b3FY', 'KbY9', 'gurm', 'W5GL', 'PtOd', 'STg9', '6xA4'];
+  // SECURITY: NO hardcoded keys in source code!
+  // Users enter their OWN Groq API keys via Setup Screen or Settings modal.
+  // Keys stored locally in browser localStorage only — never uploaded.
 
   function getKeys() {
     try {
@@ -115,7 +116,11 @@
         return saved.map(k => k.trim());
       }
     } catch { /* fallthrough */ }
-    return [_k1.join(''), _k2.join('')];
+    return []; // No keys until user adds their own
+  }
+
+  function hasKeys() {
+    return getKeys().length > 0;
   }
 
   function getNextKey() {
@@ -370,6 +375,7 @@
     loadTheme();
     setupEventListeners();
     setupKeyboardFix();
+    setupSetupScreen();
     renderChatHistory();
 
     const userBadge = $('#userBadge');
@@ -380,6 +386,59 @@
 
     registerUser();
     updateKeyStatus();
+
+    // Show setup screen if no API keys entered
+    if (!hasKeys()) {
+      const setupScreen = $('#setupScreen');
+      if (setupScreen) setupScreen.style.display = 'flex';
+    }
+  }
+
+  function setupSetupScreen() {
+    const setupScreen = $('#setupScreen');
+    const setupSaveBtn = $('#setupSaveBtn');
+    const setupApiKey = $('#setupApiKey');
+    const setupMultiKeys = $('#setupMultiKeys');
+    const setupShowKey = $('#setupShowKey');
+    const setupKeyMulti = $('#setupKeyMulti');
+
+    // Show/hide multi-key area
+    if (setupApiKey) {
+      setupApiKey.addEventListener('input', () => {
+        if (setupKeyMulti) setupKeyMulti.style.display = setupApiKey.value.includes('\n') ? 'block' : 'none';
+      });
+    }
+
+    // Toggle show key
+    if (setupShowKey && setupApiKey) {
+      setupShowKey.addEventListener('change', () => {
+        setupApiKey.type = setupShowKey.checked ? 'text' : 'password';
+      });
+    }
+
+    if (setupSaveBtn) {
+      setupSaveBtn.addEventListener('click', () => {
+        let keys = [];
+        if (setupMultiKeys && setupMultiKeys.value.trim()) {
+          keys = setupMultiKeys.value.trim().split('\n').map(k => k.trim()).filter(k => k.length > 10);
+        }
+        if (setupApiKey && setupApiKey.value.trim()) {
+          const k = setupApiKey.value.trim();
+          if (k.length > 10) keys.push(k);
+        }
+        if (keys.length > 0) {
+          localStorage.setItem('dvc_keys', JSON.stringify(keys));
+          failedKeys.clear();
+          currentKeyIndex = 0;
+          updateKeyStatus();
+          if (setupScreen) setupScreen.style.display = 'none';
+          setupSaveBtn.textContent = '✅ Launched!';
+        } else {
+          setupSaveBtn.textContent = '❌ Enter a valid key';
+          setTimeout(() => { setupSaveBtn.textContent = '🚀 Launch DVC AI'; }, 2000);
+        }
+      });
+    }
   }
 
   function setupEventListeners() {
@@ -640,6 +699,13 @@
     const text = userInput.value.trim();
     if (!text) return;
     if (isGenerating) return;
+
+    // Check for API keys — show setup screen if none
+    if (!hasKeys()) {
+      const setupScreen = $('#setupScreen');
+      if (setupScreen) setupScreen.style.display = 'flex';
+      return;
+    }
 
     isBlocked = await checkBlockStatus();
     if (isBlocked) { showBlockScreen(); return; }
