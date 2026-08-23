@@ -37,6 +37,11 @@
   const VISION_MODELS = ['qwen/qwen3.6-27b'];
   const DEFAULT_VISION_MODEL = 'qwen/qwen3.6-27b';
 
+  // Model ID passthrough (all IDs are already correct Groq model names)
+  function resolveModel(model) {
+    return model;
+  }
+
   function isCompoundModel(model) {
     return COMPOUND_MODELS.some(m => model.includes(m) || m.includes(model));
   }
