@@ -1,6 +1,6 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v2.0
-   Groq API + Key Rotation + Online/Offline Toggle
+   DVC AI CHATBOT — app.js v3.0
+   Groq API + Key Rotation + User Tracking + Block System
    promode × @dvc 2026
    ============================================ */
 
@@ -9,9 +9,42 @@
 
   // ============ CONFIG ============
   const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const STATUS_URL = 'https://donrich99.github.io/dvcaichat/status.json'; // Where toggle.sh writes
+  const REPO_BASE = 'https://donpoor99.github.io/dvcaichat';
+  const STATUS_URL = REPO_BASE + '/status.json';
+  const USERS_URL = REPO_BASE + '/users.json';
 
   const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You are built by promode. You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers. You can write code, explain anything, help with business ideas, and much more. Be concise but thorough. Use markdown formatting when helpful. Format code blocks properly with language tags.`;
+
+  // ============ USER ID MANAGEMENT ============
+  function getUserId() {
+    let userId = localStorage.getItem('dvc_user_id');
+    if (!userId) {
+      // Generate unique user ID: DVC-XXXXXX (6 chars)
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+      let id = '';
+      for (let i = 0; i < 6; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      userId = 'DVC-' + id;
+      localStorage.setItem('dvc_user_id', userId);
+      localStorage.setItem('dvc_first_visit', new Date().toISOString());
+    }
+    return userId;
+  }
+
+  function getUserStats() {
+    return {
+      id: getUserId(),
+      firstVisit: localStorage.getItem('dvc_first_visit') || 'unknown',
+      totalChats: (JSON.parse(localStorage.getItem('dvc_chats') || '[]')).length,
+      userAgent: navigator.userAgent,
+      screen: `${screen.width}x${screen.height}`,
+      language: navigator.language,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    };
+  }
+
+  const CURRENT_USER_ID = getUserId();
 
   // ============ STATE ============
   let currentModel = localStorage.getItem('dvc_model') || 'llama-3.3-70b-versatile';
@@ -21,6 +54,7 @@
   let currentChatId = null;
   let isOnline = true;
   let isGenerating = false;
+  let isBlocked = false;
 
   // ============ DOM ============
   const $ = (s) => document.querySelector(s);
@@ -42,9 +76,7 @@
   function getKeys() {
     try {
       return JSON.parse(localStorage.getItem('dvc_groq_keys') || '[]');
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   function setKeys(keys) {
@@ -67,10 +99,9 @@
   }
 
   function markKeyFailed() {
-    const keys = getKeys();
     failedKeys.add(currentKeyIndex);
-    if (failedKeys.size >= keys.length) failedKeys.clear();
-    currentKeyIndex = (currentKeyIndex + 1) % keys.length;
+    if (failedKeys.size >= getKeys().length) failedKeys.clear();
+    currentKeyIndex = (currentKeyIndex + 1) % getKeys().length;
     updateKeyStatus();
   }
 
@@ -86,50 +117,69 @@
     if (countEl) countEl.textContent = keys.length;
   }
 
-  // ============ ONLINE/OFFLINE CHECK ============
+  // ============ STATUS CHECKS ============
   async function checkOnlineStatus() {
     try {
       const res = await fetch(STATUS_URL + '?t=' + Date.now(), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
-      if (!res.ok) {
-        // If status.json doesn't exist or error — default to ONLINE
-        return true;
-      }
+      if (!res.ok) return true;
       const data = await res.json();
       return data.status === 'on';
-    } catch {
-      // If can't reach — assume online (GitHub Pages might be slow)
-      return true;
-    }
+    } catch { return true; }
+  }
+
+  async function checkBlockStatus() {
+    try {
+      const res = await fetch(USERS_URL + '?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      if (!res.ok) return false;
+      const users = await res.json();
+      const me = users.users?.find(u => u.id === CURRENT_USER_ID);
+      return me ? me.blocked === true : false;
+    } catch { return false; }
   }
 
   async function enforceStatus() {
     isOnline = await checkOnlineStatus();
     if (!isOnline) {
       offlineScreen.style.display = 'flex';
-      document.body.style.display = 'block';
-    } else {
-      offlineScreen.style.display = 'none';
+      return false;
     }
+    isBlocked = await checkBlockStatus();
+    if (isBlocked) {
+      showBlockScreen();
+      return false;
+    }
+    return true;
+  }
+
+  function showBlockScreen() {
+    offlineScreen.style.display = 'flex';
+    offlineScreen.innerHTML = `
+      <div class="offline-content">
+        <div class="offline-icon">⛔</div>
+        <h1>You Are Blocked</h1>
+        <p>Your access to DVC AI has been restricted by the administrator.</p>
+        <div class="offline-footer">
+          <span>Your ID: ${CURRENT_USER_ID}</span>
+          <span>Contact @dvc if you think this is an error</span>
+        </div>
+      </div>`;
   }
 
   // ============ INIT ============
   async function init() {
+    const ok = await enforceStatus();
+    if (!ok) return;
+
     const keys = getKeys();
 
-    // Check online/offline
-    await enforceStatus();
-    if (!isOnline) return;
-
-    // Setup screen if no keys
     if (keys.length === 0) {
-      setupScreen.style.display = 'flex';
-      setupScreen.style.flexDirection = 'column';
-      setupScreen.style.alignItems = 'center';
-      setupScreen.style.justifyContent = 'center';
-      setupSetupScreen();
+      showSetupScreen();
       return;
     }
 
@@ -139,12 +189,29 @@
     setupEventListeners();
     loadTheme();
     updateKeyStatus();
+    updateUserBadge();
 
     if (chats.length > 0) {
       loadChat(chats[0].id);
     }
 
     userInput.focus();
+  }
+
+  function updateUserBadge() {
+    // Show user ID in the footer
+    const badgeEl = $('#userBadge');
+    if (badgeEl) {
+      badgeEl.textContent = `🆔 ${CURRENT_USER_ID}`;
+    }
+  }
+
+  function showSetupScreen() {
+    setupScreen.style.display = 'flex';
+    setupScreen.style.flexDirection = 'column';
+    setupScreen.style.alignItems = 'center';
+    setupScreen.style.justifyContent = 'center';
+    setupSetupScreen();
   }
 
   // ============ SETUP SCREEN ============
@@ -160,23 +227,16 @@
 
     saveBtn.addEventListener('click', () => {
       let newKeys = [];
-
-      // Single key
       const single = keyInput.value.trim();
-      if (single) {
-        newKeys.push(single);
-      }
+      if (single) newKeys.push(single);
 
-      // Multiple keys
       const multi = multiInput.value.trim();
       if (multi) {
         const lines = multi.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         newKeys = newKeys.concat(lines);
       }
 
-      // Deduplicate
       newKeys = [...new Set(newKeys)];
-
       if (newKeys.length === 0) {
         alert('Please enter at least one API key!');
         return;
@@ -187,7 +247,6 @@
       init(); // Re-init with keys loaded
     });
 
-    // Enter to save
     keyInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') saveBtn.click();
     });
@@ -196,12 +255,11 @@
   // ============ SETTINGS MODAL ============
   function openSettings() {
     settingsModal.style.display = 'flex';
-    const keys = getKeys();
     updateKeyStatus();
 
-    // Show saved keys
     const listEl = $('#savedKeysList');
     listEl.innerHTML = '';
+    const keys = getKeys();
     if (keys.length === 0) {
       listEl.innerHTML = '<p style="color:var(--text-muted)">No keys saved yet.</p>';
     } else {
@@ -228,7 +286,6 @@
       if (e.target === settingsModal) closeSettings();
     });
 
-    // Save keys
     $('#settingsSaveKeys').addEventListener('click', () => {
       const existingKeys = getKeys();
       let newKeys = [];
@@ -249,12 +306,11 @@
         $('#settingsMultiKeys').value = '';
         failedKeys.clear();
         currentKeyIndex = 0;
-        openSettings(); // Refresh modal
+        openSettings();
         updateKeyStatus();
       }
     });
 
-    // Remove keys
     $('#savedKeysList').addEventListener('click', (e) => {
       const btn = e.target.closest('.key-remove');
       if (btn) {
@@ -264,21 +320,16 @@
         setKeys(keys);
         failedKeys.clear();
         currentKeyIndex = 0;
-        openSettings(); // Refresh
+        openSettings();
         updateKeyStatus();
       }
     });
 
-    // Clear all keys
     $('#settingsClearKeys').addEventListener('click', () => {
       if (confirm('Remove ALL API keys? You will need to re-enter them.')) {
         setKeys([]);
         closeSettings();
-        setupScreen.style.display = 'flex';
-        setupScreen.style.flexDirection = 'column';
-        setupScreen.style.alignItems = 'center';
-        setupScreen.style.justifyContent = 'center';
-        setupSetupScreen();
+        showSetupScreen();
       }
     });
   }
@@ -318,7 +369,6 @@
 
     $('#themeToggle').addEventListener('click', toggleTheme);
 
-    // Suggestion cards
     $('#suggestionGrid').addEventListener('click', (e) => {
       const card = e.target.closest('.suggestion-card');
       if (card) {
@@ -375,7 +425,7 @@
     showWelcome();
     userInput.focus();
     $('#currentChatTitle').textContent = 'New Chat';
-    toggleSidebar(); // Close on mobile
+    toggleSidebar();
   }
 
   function loadChat(chatId) {
@@ -426,50 +476,47 @@
     const text = userInput.value.trim();
     if (!text || isGenerating) return;
 
-    // Check keys
-    if (getKeys().length === 0) {
-      setupScreen.style.display = 'flex';
-      setupScreen.style.flexDirection = 'column';
-      setupScreen.style.alignItems = 'center';
-      setupScreen.style.justifyContent = 'center';
-      setupSetupScreen();
+    // Re-check block status before sending
+    isBlocked = await checkBlockStatus();
+    if (isBlocked) {
+      showBlockScreen();
       return;
     }
 
-    // Create new chat if needed
+    // Check keys
+    if (getKeys().length === 0) {
+      showSetupScreen();
+      return;
+    }
+
     if (!currentChatId) createNewChat();
 
     const chat = chats.find(c => c.id === currentChatId);
     if (!chat) return;
 
-    // Hide welcome
     welcomeScreen.style.display = 'none';
     messagesEl.innerHTML = '';
 
-    // Title from first message
     if (chat.messages.length === 0) {
       chat.title = text.substring(0, 45) + (text.length > 45 ? '...' : '');
       $('#currentChatTitle').textContent = chat.title;
       renderChatHistory();
     }
 
-    // Add user message
     chat.messages.push({ role: 'user', content: text });
     appendMessage('user', text);
 
     userInput.value = '';
     userInput.style.height = 'auto';
 
-    // Typing indicator
     const typingEl = appendTyping();
     sendBtn.disabled = true;
     isGenerating = true;
     updateStatusDot('thinking');
 
-    // Build API messages
     const apiMessages = [
       { role: 'system', content: SYSTEM_PROMPT },
-      ...chat.messages.slice(-20).map(m => ({ role: m.role, content: m.content })) // Last 20 messages for context
+      ...chat.messages.slice(-20).map(m => ({ role: m.role, content: m.content }))
     ];
 
     let success = false;
@@ -504,9 +551,8 @@
           let buffer = '';
 
           typingEl.remove();
-          const aiMsgEl = appendMessage('ai', '...');
+          const aiMsgEl = appendMessage('ai', '');
           const bubbleEl = aiMsgEl.querySelector('.message-bubble');
-          bubbleEl.textContent = '';
 
           while (true) {
             const { done, value } = await reader.read();
@@ -529,7 +575,7 @@
                   bubbleEl.innerHTML = formatMarkdown(fullResponse);
                   scrollToBottom();
                 }
-              } catch (e) { /* skip bad chunks */ }
+              } catch (e) { /* skip */ }
             }
           }
 
@@ -557,7 +603,7 @@
 
     if (!success && attempts >= totalKeys) {
       typingEl.remove();
-      appendMessage('ai', '⚠️ All keys rate limited. Wait a minute or add new keys in Settings.', true);
+      appendMessage('ai', '⚠️ All keys rate limited. Wait or add more keys in Settings.', true);
     }
 
     sendBtn.disabled = false;
@@ -590,7 +636,6 @@
     row.appendChild(bubble);
     messagesEl.appendChild(row);
     scrollToBottom();
-
     return row;
   }
 
@@ -623,7 +668,7 @@
     requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
   }
 
-  // ============ MARKDOWN FORMATTING ============
+  // ============ MARKDOWN ============
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -634,24 +679,14 @@
     if (!text) return '';
     let html = escapeHtml(text);
 
-    // Code blocks
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
       return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
     });
 
-    // Inline code
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Bold
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-
-    // Italic
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-    // Line breaks (but not inside pre)
     html = html.replace(/\n/g, '<br>');
-
-    // Lists
     html = html.replace(/^- (.+)/gm, '• $1');
     html = html.replace(/^(\d+)\. (.+)/gm, '<strong>$1.</strong> $2');
 
