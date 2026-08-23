@@ -604,43 +604,33 @@
           }
           success = true;
 
-        } else if (response.status === 429) {
-          markKeyFailed();
-          lastError = 'rate_limit';
-          attempts++;
-        } else if (response.status === 401) {
-          markKeyFailed();
-          lastError = 'invalid_key';
-          attempts++;
-        } else if (response.status === 403) {
-          markKeyFailed();
-          lastError = 'blocked';
-          attempts++;
         } else {
+          // Capture actual API error for debugging
+          let apiErrMsg = '';
+          try {
+            const errData = await response.json();
+            apiErrMsg = errData?.error?.message || JSON.stringify(errData).substring(0, 200);
+          } catch (e) { apiErrMsg = 'HTTP ' + response.status; }
+          console.error('API Error [' + response.status + ']:', apiErrMsg);
           markKeyFailed();
-          lastError = 'http_' + response.status;
+          lastError = 'http_' + response.status + ': ' + apiErrMsg;
           attempts++;
         }
 
       } catch (err) {
+        console.error('Fetch error:', err);
+        lastError = 'Exception: ' + err.message;
         attempts++;
-        lastError = 'network';
         if (attempts >= totalKeys) {
           typingEl.remove();
-          appendMessage('ai', '⚠️ Network error. Check your internet connection.', true);
+          appendMessage('ai', `⚠️ Fetch Error:\n\n${err.message}\n\nCheck console (F12) for details.`, true);
         }
       }
     }
 
     if (!success && attempts >= totalKeys) {
       typingEl.remove();
-      const errMessages = {
-        'rate_limit': '⏳ All keys are rate-limited right now. Wait 1 minute and try again.',
-        'invalid_key': '🔑 Keys are invalid or expired. Please add fresh keys in Settings.',
-        'blocked': '🚫 Access blocked. Try a different model or check your keys in Settings.',
-        'network': '🌐 Network error. Check your internet connection and try again.'
-      };
-      appendMessage('ai', errMessages[lastError] || '⚠️ All keys failed. Add more keys in Settings.', true);
+      appendMessage('ai', `⚠️ API Error:\n\n${lastError}\n\nTry again or add more keys in Settings.`, true);
     }
 
     sendBtn.disabled = false;
