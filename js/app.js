@@ -23,7 +23,7 @@
 - When the user asks to search, or asks about current events, news, facts, people, places, trending topics, technology, coding, or ANYTHING that benefits from real data — USE the web_search tool IMMEDIATELY.
 - You do NOT need permission to search. Just search. Every query. No exceptions.
 - Image gallery is automatically shown below your response — you do NOT need to embed images.
-- YouTube videos are automatically embedded when you include YouTube URLs.
+- YouTube videos are automatically embedded when you include YouTube URLs. PREFER videos from official/popular channels (they allow embedding). Always give the full URL like https://www.youtube.com/watch?v=VIDEO_ID. If unsure about embed availability, include 2-3 alternative video URLs so users have options.
 - Write code in proper markdown code blocks with language labels.
 
 ## SEARCH RULES:
@@ -1099,8 +1099,35 @@
       btn.addEventListener('click', () => {
         const embedDiv = btn.closest('.video-embed');
         const videoId = embedDiv.dataset.videoId;
-        // Use www.youtube.com/embed (youtube-nocookie blocks many videos)
-        embedDiv.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>`;
+        // Try embed first, with Watch on YouTube fallback
+        embedDiv.innerHTML = `
+          <div style="position:relative;width:100%;height:100%;background:#000;border-radius:12px;overflow:hidden;">
+            <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
+            <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener" style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.75);color:#fff;padding:6px 12px;border-radius:8px;font-size:12px;text-decoration:none;display:flex;align-items:center;gap:5px;z-index:10;backdrop-filter:blur(4px);">▶ Watch on YouTube ↗</a>
+          </div>`;
+        // Auto fallback: if YouTube doesn't confirm load in 4s, show Watch on YouTube
+        let confirmed = false;
+        const failTimer = setTimeout(() => {
+          if (confirmed) return;
+          embedDiv.innerHTML = `
+            <div style="position:relative;width:100%;height:100%;min-height:200px;background:#111;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+              <img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.3;" onerror="this.style.display='none'">
+              <div style="position:relative;z-index:1;text-align:center;">
+                <p style="color:#fff;margin:0 0 8px;font-size:14px;">Embedding not available for this video</p>
+                <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#f00;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:600;font-size:14px;">▶ Watch on YouTube</a>
+              </div>
+            </div>`;
+        }, 4000);
+        window.addEventListener('message', function ytMsg(e) {
+          try {
+            const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+            if (d && (d.event === 'onReady' || d.event === 'infoDelivery')) {
+              confirmed = true;
+              clearTimeout(failTimer);
+              window.removeEventListener('message', ytMsg);
+            }
+          } catch(err) {}
+        });
       });
     });
   }
@@ -1226,7 +1253,7 @@
 
     // Restore YouTube embeds
     youtubeVideos.forEach((vid, idx) => {
-      const wrapper = `<div class="video-embed" data-video-id="${vid}"><iframe-loader style="display:block;background:#000;border-radius:12px;aspect-ratio:16/9;position:relative;overflow:hidden;"><img src="https://img.youtube.com/vi/${vid}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" alt="YouTube video" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${vid}/mqdefault.jpg';this.style.opacity='0.5'"><div class="play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);cursor:pointer;"><div style="width:68px;height:48px;background:#f00;border-radius:12px;display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div><span style="position:absolute;bottom:8px;left:12px;color:#fff;font-size:11px;opacity:0.8;">▶ YouTube</span></iframe-loader></div>`;
+      const wrapper = `<div class="video-embed" data-video-id="${vid}"><iframe-loader style="display:block;background:#000;border-radius:12px;aspect-ratio:16/9;position:relative;overflow:hidden;"><img src="https://img.youtube.com/vi/${vid}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" alt="YouTube video" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${vid}/mqdefault.jpg';this.style.opacity='0.5'"><div class="play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);cursor:pointer;"><div style="width:68px;height:48px;background:#f00;border-radius:12px;display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div><span style="position:absolute;bottom:8px;left:12px;color:#fff;font-size:11px;opacity:0.8;">▶ YouTube</span></iframe-loader></div><a href="https://www.youtube.com/watch?v=${vid}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#aaa;text-decoration:none;margin-top:4px;padding:2px 0;transition:color 0.2s;" onmouseover="this.style.color='#f00'" onmouseout="this.style.color='#aaa'">▶ Watch on YouTube ↗</a>`;
       html = html.replace(`\x00YT${idx}\x00`, wrapper);
     });
 
