@@ -22,6 +22,16 @@
 
   const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You are built by promode. You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers. You can write code, explain anything, help with business ideas, and much more. Be concise but thorough. Use markdown formatting when helpful. Format code blocks properly with language tags.`;
 
+  // Obfuscated model ID mapping (display names → real API IDs)
+  const MODEL_MAP = {
+    'compound-x': atob('Z3JvcS9jb21wb3VuZA=='),
+    'compound-m': atob('Z3JvcS9jb21wb3VuZC1taW5p')
+  };
+
+  function resolveModel(model) {
+    return MODEL_MAP[model] || model;
+  }
+
   // ============ USER ID MANAGEMENT ============
   function getUserId() {
     let userId = localStorage.getItem('dvc_user_id');
@@ -85,7 +95,7 @@
       let keys = JSON.parse(localStorage.getItem('dvc_api_keys') || '[]');
       // Auto-migrate old key storage
       if (keys.length === 0) {
-        const oldKeys = JSON.parse(localStorage.getItem('dvc_groq_keys') || '[]');
+        const oldKeys = JSON.parse(localStorage.getItem('dvc_legacy_keys') || '[]');
         if (oldKeys.length > 0) {
           keys = oldKeys;
           setKeys(keys);
@@ -560,7 +570,7 @@
             'Authorization': `Bearer ${key}`
           },
           body: JSON.stringify({
-            model: currentModel,
+            model: resolveModel(currentModel),
             messages: apiMessages,
             max_tokens: 4096,
             temperature: 0.7,
