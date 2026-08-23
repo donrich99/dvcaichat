@@ -54,6 +54,29 @@
     return model;
   }
 
+  // Rate-limit fallback chain — auto-switch when current model hits TPM limit
+  const MODEL_FALLBACKS = {
+    'openai/gpt-oss-120b': ['openai/gpt-oss-20b', 'qwen/qwen3.6-27b'],
+    'openai/gpt-oss-20b': ['openai/gpt-oss-120b', 'qwen/qwen3.6-27b'],
+    'qwen/qwen3.6-27b': ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'],
+    'groq/compound': ['groq/compound-mini', 'openai/gpt-oss-20b'],
+    'groq/compound-mini': ['groq/compound', 'openai/gpt-oss-20b'],
+  };
+  let rateLimitedModels = new Set(); // Reset per request
+
+  function getNextFallbackModel(current) {
+    if (!currentModel) return null;
+    // Check if we already switched this request
+    const chain = MODEL_FALLBACKS[currentModel] || [];
+    for (const alt of chain) {
+      if (!rateLimitedModels.has(alt)) {
+        rateLimitedModels.add(alt);
+        return alt;
+      }
+    }
+    return null; // All alternatives exhausted
+  }
+
   function isCompoundModel(model) {
     return COMPOUND_MODELS.some(m => model.includes(m) || m.includes(model));
   }
@@ -229,7 +252,7 @@
           const pages = d.query?.pages || {};
           Object.values(pages).forEach(p => {
             const thumb = p.thumbnail?.source;
-            const extract = p.extract ? p.extract.substring(0, 300) : '';
+            const extract = p.extract ? p.extract.substring(0, 150) : '';
             results.push({
               title: p.title,
               snippet: extract || `Wikipedia article about ${p.title}`,
@@ -297,7 +320,7 @@
             if (title && link) {
               results.push({
                 title: title.substring(0, 150),
-                snippet: desc.replace(/<[^>]+>/g, '').substring(0, 300),
+                snippet: desc.replace(/<[^>]+>/g, '').substring(0, 150),
                 url: link,
                 source: 'Bing News'
               });
@@ -373,7 +396,7 @@
           doc.querySelectorAll(`entry`).forEach((entry, i) => {
             if (i >= 3) return;
             const title = entry.querySelector('title')?.textContent?.trim() || '';
-            const summary = entry.querySelector('summary')?.textContent?.trim()?.substring(0, 300) || '';
+            const summary = entry.querySelector('summary')?.textContent?.trim()?.substring(0, 150) || '';
             const link = entry.querySelector('link[rel="alternate"]')?.getAttribute('href') || entry.querySelector('id')?.textContent || '';
             if (title) {
               results.push({
@@ -426,7 +449,7 @@
       query,
       total: unique.length,
       sources: [...new Set(unique.map(r => r.source))],
-      results: unique.slice(0, 15),
+      results: unique.slice(0, 8),
       images_found: lastSearchImages.length,
       note: 'Results ranked by relevance. Images will be shown automatically below your response.'
     });
@@ -877,6 +900,8 @@
 
     let success = false;
     let lastError = '';
+    rateLimitedModels.clear(); // Reset fallback state per request
+    const savedModel = currentModel; // Restore after fallback
     const totalKeys = getKeys().length;
     const useTools = !isCompoundModel(currentModel);
     const maxAttempts = 3;
@@ -890,7 +915,7 @@
           // === ReAct loop for tool-capable models (gpt-oss, qwen) ===
           let finalResponse = '';
           let round = 0;
-          const MAX_ROUNDS = 3;
+          const MAX_ROUNDS = 2;
           const localMessages = [...apiMessages];
 
           while (round < MAX_ROUNDS) {
@@ -916,16 +941,28 @@
               try { const errData = await response.json(); apiErrMsg = errData?.error?.message || 'HTTP ' + response.status; } catch { apiErrMsg = 'HTTP ' + response.status; }
               console.error('API Error:', apiErrMsg);
 
-              // Rate limit (429) — auto-retry after wait time
+              // Rate limit (429) — auto-retry with model fallback
               if (response.status === 429) {
                 const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
                 const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
+                // Try a different model first
+                const altModel = getNextFallbackModel(currentModel);
+                if (altModel) {
+                  removeTempMessages();
+                  appendMessage('ai', `⏳ ${currentModel} rate limited — switching to ${altModel}...`, false, true);
+                  currentModel = altModel;
+                  await new Promise(r => setTimeout(r, 1500)); // Brief pause
+                  removeTempMessages();
+                  round--; // Retry same round with new model
+                  continue;
+                }
+                // No more fallback models — wait and retry current model
                 if (round < MAX_ROUNDS) {
                   removeTempMessages();
-                  appendMessage('ai', `⏳ Rate limit hit — waiting ${waitSec}s then retrying...`, false, true);
+                  appendMessage('ai', `⏳ Rate limit — waiting ${waitSec}s...`, false, true);
                   await new Promise(r => setTimeout(r, waitSec * 1000));
                   removeTempMessages();
-                  round--; // Retry same round
+                  round--;
                   continue;
                 }
               }
@@ -1004,11 +1041,18 @@
             if (response.status === 429) {
               const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
               const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
+              // Try a different model
+              const altModel = getNextFallbackModel(currentModel);
+              if (altModel) {
+                removeTempMessages();
+                appendMessage('ai', `⏳ ${currentModel} rate limited — switching to ${altModel}...`, false, true);
+                currentModel = altModel;
+                await new Promise(r => setTimeout(r, 1500));
+                attempt--; continue;
+              }
               removeTempMessages();
-              appendMessage('ai', `⏳ Rate limit hit — waiting ${waitSec}s then retrying...`, false, true);
+              appendMessage('ai', `⏳ Rate limit — waiting ${waitSec}s...`, false, true);
               await new Promise(r => setTimeout(r, waitSec * 1000));
-              removeTempMessages();
-              // Don't consume another key attempt — retry same key after rate limit
               attempt--;
               continue;
             }
@@ -1085,6 +1129,10 @@
     saveChats();
     userInput.focus();
     updateKeyStatus();
+    // Restore user's original model if we switched due to rate limit
+    if (currentModel !== savedModel) {
+      currentModel = savedModel;
+    }
   }
 
   // ============ MEDIA ENHANCEMENTS ============
