@@ -507,6 +507,8 @@ def main():
         print('Set: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, GITHUB_TOKEN')
         exit(1)
 
+    print(f'Config: TOKEN={TELEGRAM_BOT_TOKEN[:8]}...{TELEGRAM_BOT_TOKEN[-4:] if len(TELEGRAM_BOT_TOKEN)>12 else "?"} | CHAT_ID={TELEGRAM_CHAT_ID!r} | GH_TOKEN={"SET("+str(len(GITHUB_TOKEN))+")" if GITHUB_TOKEN else "MISSING"}')
+
     # Load last processed update_id
     state = get_local_state()
     last_id = state.get('last_update_id', 0)
