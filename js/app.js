@@ -20,7 +20,7 @@
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
 
-  const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You are built by promode. You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers. You can write code, explain anything, help with business ideas, and much more. Be concise but thorough. Use markdown formatting when helpful. Format code blocks properly with language tags.`;
+  const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You are built by promode. You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers. You can write code, explain anything, help with business ideas, and much more. Be concise but thorough. Use markdown formatting when helpful. Format code blocks properly with language tags. IMPORTANT: You can VIEW and ANALYZE images that users send (describe them, extract text, explain content), but you CANNOT generate, edit, or manipulate images. If asked to edit an image, politely explain that you can analyze it but image editing is not available yet — suggest what they can do instead (e.g., describe the edit needed so they can do it in Canva/Photoshop).`;
 
   // Obfuscated model ID mapping (display names → real API IDs)
   const MODEL_MAP = {
@@ -1068,21 +1068,36 @@
 
   function formatMarkdown(text) {
     if (!text) return '';
-    let html = escapeHtml(text);
 
-    // Code blocks with language detection
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
-      const langLabel = lang || 'text';
-      const codeId = 'code_' + Math.random().toString(36).substring(2, 8);
-      return `<div class="code-block-wrapper" data-lang="${langLabel}" data-code-id="${codeId}"><div class="code-block-header"><span class="code-block-lang">${langLabel}</span><div class="code-block-actions"></div></div><pre><code class="language-${lang}" id="${codeId}">${code.trim()}</code></pre></div>`;
+    // STEP 1: Extract ALL code blocks FIRST (before any other processing)
+    const codeBlocks = [];
+    let html = text.replace(/```(\w*)\r?\n?([\s\S]*?)```/g, (m, lang, code) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push({ lang: lang || 'text', code: code });
+      return `\x00CODEBLOCK${idx}\x00`;
     });
 
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // STEP 2: Escape HTML in remaining text
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // STEP 3: Inline formatting on non-code-block text
+    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // STEP 4: Newlines → <br> (safe now — code blocks are placeholders)
     html = html.replace(/\n/g, '<br>');
     html = html.replace(/^- (.+)/gm, '• $1');
     html = html.replace(/^(\d+)\. (.+)/gm, '<strong>$1.</strong> $2');
+
+    // STEP 5: Restore code blocks with proper wrappers
+    codeBlocks.forEach((block, idx) => {
+      const langLabel = block.lang;
+      const escapedCode = escapeHtml(block.code);
+      const codeId = 'code_' + Math.random().toString(36).substring(2, 8);
+      const wrapper = `<div class="code-block-wrapper" data-lang="${langLabel}" data-code-id="${codeId}"><div class="code-block-header"><span class="code-block-lang">${langLabel}</span><div class="code-block-actions"></div></div><pre><code class="language-${langLabel}" id="${codeId}">${escapedCode}</code></pre></div>`;
+      html = html.replace(`\x00CODEBLOCK${idx}\x00`, wrapper);
+    });
 
     return html;
   }
@@ -1150,82 +1165,126 @@
 
     // Detect common file generation patterns
     const filePatterns = [
-      { regex: /```html\b/i, name: 'index.html', icon: '🌐' },
-      { regex: /```css\b/i, name: 'style.css', icon: '🎨' },
-      { regex: /```python|```py\b/i, name: 'script.py', icon: '🐍' },
-      { regex: /```javascript|```js\b/i, name: 'script.js', icon: '⚡' },
-      { regex: /```json\b/i, name: 'data.json', icon: '📋' },
-      { regex: /```xml\b/i, name: 'data.xml', icon: '📄' },
-      { regex: /```yaml|```yml\b/i, name: 'config.yml', icon: '⚙️' },
-      { regex: /```bash|```sh\b/i, name: 'script.sh', icon: '🖥️' },
-      { regex: /```sql\b/i, name: 'query.sql', icon: '🗃️' },
-      { regex: /```typescript|```ts\b/i, name: 'script.ts', icon: '📘' },
-      { regex: /```jsx\b/i, name: 'Component.jsx', icon: '⚛️' },
-      { regex: /```tsx\b/i, name: 'Component.tsx', icon: '⚛️' },
-      { regex: /```java\b/i, name: 'Main.java', icon: '☕' },
-      { regex: /```php\b/i, name: 'index.php', icon: '🐘' },
-      { regex: /```go\b/i, name: 'main.go', icon: '🐹' },
-      { regex: /```rust|```rs\b/i, name: 'main.rs', icon: '🦀' },
+      { regex: /html/i, name: 'index.html', icon: '🌐' },
+      { regex: /css/i, name: 'style.css', icon: '🎨' },
+      { regex: /python|py/i, name: 'script.py', icon: '🐍' },
+      { regex: /javascript|js/i, name: 'script.js', icon: '⚡' },
+      { regex: /json/i, name: 'data.json', icon: '📋' },
+      { regex: /xml/i, name: 'data.xml', icon: '📄' },
+      { regex: /yaml|yml/i, name: 'config.yml', icon: '⚙️' },
+      { regex: /bash|sh/i, name: 'script.sh', icon: '🖥️' },
+      { regex: /sql/i, name: 'query.sql', icon: '🗃️' },
+      { regex: /typescript|ts/i, name: 'script.ts', icon: '📘' },
+      { regex: /jsx/i, name: 'Component.jsx', icon: '⚛️' },
+      { regex: /tsx/i, name: 'Component.tsx', icon: '⚛️' },
+      { regex: /java/i, name: 'Main.java', icon: '☕' },
+      { regex: /php/i, name: 'index.php', icon: '🐘' },
+      { regex: /go/i, name: 'main.go', icon: '🐹' },
+      { regex: /rust|rs/i, name: 'main.rs', icon: '🦀' },
+      { regex: /c\b|cpp|c\+\+/i, name: 'main.c', icon: '🔧' },
     ];
 
-    // Only show output panel for first code block
+    // Find all code blocks
     const codeBlocks = bubble.querySelectorAll('.code-block-wrapper');
-    if (codeBlocks.length === 0) return;
 
-    const firstCodeBlock = codeBlocks[0];
-    const lang = firstCodeBlock.dataset.lang || '';
-    const codeEl = firstCodeBlock.querySelector('code');
-    if (!codeEl) return;
+    // Build output panels for EACH code block found
+    if (codeBlocks.length > 0) {
+      codeBlocks.forEach((codeBlock, blockIdx) => {
+        const lang = codeBlock.dataset.lang || '';
+        const codeEl = codeBlock.querySelector('code');
+        if (!codeEl) return;
 
-    let matchedPattern = filePatterns.find(p => p.regex.test('```' + lang));
-    if (!matchedPattern) {
-      // Try to detect from content
-      const text = codeEl.textContent;
-      if (text.includes('<!DOCTYPE html') || text.includes('<html')) matchedPattern = filePatterns[0];
-      else if (text.includes('def ') || text.includes('import ')) matchedPattern = filePatterns[2];
-      else if (text.includes('function ') || text.includes('const ') || text.includes('=>')) matchedPattern = filePatterns[3];
-      else if (text.includes('{') && text.includes('}')) matchedPattern = filePatterns[4];
-      else matchedPattern = { name: 'output.txt', icon: '📄' };
+        let matchedPattern = filePatterns.find(p => p.regex.test(lang));
+        if (!matchedPattern) {
+          const content = codeEl.textContent;
+          if (content.includes('<!DOCTYPE') || content.includes('<html')) matchedPattern = filePatterns[0];
+          else if (content.includes('def ') || content.includes('import ')) matchedPattern = filePatterns[2];
+          else if (content.includes('function ') || content.includes('const ') || content.includes('=>') || content.includes('document.')) matchedPattern = filePatterns[3];
+          else if (content.trim().startsWith('{') || content.trim().startsWith('[')) matchedPattern = filePatterns[4];
+          else matchedPattern = { name: `output.${langToExt(lang)}`, icon: '📄' };
+        }
+
+        const panel = document.createElement('div');
+        panel.className = 'output-panel';
+        panel.innerHTML = `
+          <div class="output-info">
+            <span class="output-file-icon">${matchedPattern.icon}</span>
+            <span class="output-filename">${matchedPattern.name}</span>
+            <span class="output-filesize">${formatBytes(codeEl.textContent.length)}</span>
+          </div>
+          <div class="output-actions">
+            <button class="copy-output-btn">📋 Copy</button>
+            <button class="download-output-btn">⬇️ Download ${matchedPattern.name}</button>
+          </div>
+        `;
+
+        // Wire up copy button
+        panel.querySelector('.copy-output-btn').addEventListener('click', async function() {
+          try {
+            await navigator.clipboard.writeText(codeEl.textContent);
+            this.textContent = '✅ Copied!';
+            setTimeout(() => { this.textContent = '📋 Copy'; }, 2000);
+          } catch {
+            const ta = document.createElement('textarea');
+            ta.value = codeEl.textContent;
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta);
+            this.textContent = '✅ Copied!';
+            setTimeout(() => { this.textContent = '📋 Copy'; }, 2000);
+          }
+        });
+
+        // Wire up download button
+        panel.querySelector('.download-output-btn').addEventListener('click', () => {
+          const ext = langToExt(lang);
+          downloadFile(`${matchedPattern.name}`, codeEl.textContent);
+        });
+
+        // Insert panel AFTER the code block wrapper
+        codeBlock.parentNode.insertBefore(panel, codeBlock.nextSibling);
+      });
+
+    } else {
+      // No code blocks detected — check raw text for code-like content
+      // Show a download option for the full response if it looks like it contains code
+      const hasCodeLike = /function\s|class\s|def\s|import\s|<!DOCTYPE|<html|const\s|let\s|var\s|#include|package\s/.test(fullText);
+      if (!hasCodeLike) return;
+
+      const panel = document.createElement('div');
+      panel.className = 'output-panel';
+      panel.innerHTML = `
+        <div class="output-info">
+          <span class="output-file-icon">📄</span>
+          <span class="output-filename">response.txt</span>
+          <span class="output-filesize">${formatBytes(fullText.length)}</span>
+        </div>
+        <div class="output-actions">
+          <button class="copy-output-btn">📋 Copy All</button>
+          <button class="download-output-btn">⬇️ Download Response</button>
+        </div>
+      `;
+
+      panel.querySelector('.copy-output-btn').addEventListener('click', async function() {
+        try {
+          await navigator.clipboard.writeText(fullText);
+          this.textContent = '✅ Copied!';
+          setTimeout(() => { this.textContent = '📋 Copy All'; }, 2000);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = fullText;
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+          document.body.removeChild(ta);
+          this.textContent = '✅ Copied!';
+          setTimeout(() => { this.textContent = '📋 Copy All'; }, 2000);
+        }
+      });
+
+      panel.querySelector('.download-output-btn').addEventListener('click', () => {
+        downloadFile('response.txt', fullText);
+      });
+
+      bubble.appendChild(panel);
     }
-
-    const panel = document.createElement('div');
-    panel.className = 'output-panel';
-    panel.innerHTML = `
-      <div class="output-info">
-        <span class="output-file-icon">${matchedPattern.icon}</span>
-        <span class="output-filename">${matchedPattern.name}</span>
-        <span class="output-filesize">${formatBytes(codeEl.textContent.length)}</span>
-      </div>
-      <div class="output-actions">
-        <button class="copy-output-btn" data-content="${btoa(encodeURIComponent(codeEl.textContent))}">📋 Copy</button>
-        <button class="download-output-btn">⬇️ Download ${matchedPattern.name}</button>
-      </div>
-    `;
-
-    // Wire up copy button
-    panel.querySelector('.copy-output-btn').addEventListener('click', async function() {
-      try {
-        await navigator.clipboard.writeText(codeEl.textContent);
-        this.textContent = '✅ Copied!';
-        setTimeout(() => { this.textContent = '📋 Copy'; }, 2000);
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = codeEl.textContent;
-        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-        document.body.removeChild(ta);
-        this.textContent = '✅ Copied!';
-        setTimeout(() => { this.textContent = '📋 Copy'; }, 2000);
-      }
-    });
-
-    // Wire up download button
-    panel.querySelector('.download-output-btn').addEventListener('click', () => {
-      const ext = langToExt(lang);
-      downloadFile(`output.${ext}`, codeEl.textContent);
-    });
-
-    // Insert after the first code block wrapper
-    firstCodeBlock.parentNode.insertBefore(panel, firstCodeBlock.nextSibling);
   }
 
   function langToExt(lang) {

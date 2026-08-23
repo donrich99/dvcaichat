@@ -110,7 +110,7 @@ def update_github_file(url, content_dict, message):
 
 # ============ TELEGRAM API ============
 def send_msg(text):
-    """Send a Telegram message."""
+    """Send a Telegram message with fallback to plain text on HTML errors."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         print('Missing Telegram config')
         return False
@@ -120,7 +120,22 @@ def send_msg(text):
             'text': text,
             'parse_mode': 'HTML'
         }, timeout=10)
-        return r.status_code == 200
+        if r.status_code == 200:
+            print(f'[TG] Message sent OK ({len(text)} chars)')
+            return True
+        # HTML parse failed — retry as plain text
+        print(f'[TG] HTML send failed {r.status_code}: {r.text[:200]}')
+        r2 = requests.post(f'{TG_API}/sendMessage', json={
+            'chat_id': TELEGRAM_CHAT_ID,
+            'text': text.replace('<b>', '*').replace('</b>', '*')
+                        .replace('<code>', '`').replace('</code>', '`')
+                        .replace('<i>', '_').replace('</i>', '_')
+        }, timeout=10)
+        if r2.status_code == 200:
+            print('[TG] Plain text fallback sent OK')
+            return True
+        print(f'[TG] Fallback ALSO failed {r2.status_code}: {r2.text[:200]}')
+        return False
     except Exception as e:
         print(f'TG error: {e}')
         return False
