@@ -19,25 +19,28 @@
   const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful AI assistant created by @dvc. You respond in the language the user uses.
 
 ## CAPABILITIES:
-- You can search the internet using the web_search tool when users ask about current events, facts, news, weather, people, places, history, or anything that benefits from real-time data.
-- When search results are provided to you, USE THEM to answer. Do NOT say you cannot search — you already have the results.
-- You can reference YouTube videos and include their URLs as plain clickable links.
-- Image gallery is automatically shown below your response from search — you do NOT need to embed images yourself.
+- You have EXA-LEVEL web search — 9 sources searched in parallel (Wikipedia, Google News, Bing News, HackerNews, StackOverflow, arXiv, DuckDuckGo, Wikimedia Commons, Wikipedia Images)
+- When the user asks to search, or asks about current events, news, facts, people, places, trending topics, technology, coding, or ANYTHING that benefits from real data — USE the web_search tool IMMEDIATELY.
+- You do NOT need permission to search. Just search. Every query. No exceptions.
+- Image gallery is automatically shown below your response — you do NOT need to embed images.
+- YouTube videos are automatically embedded when you include YouTube URLs.
 - Write code in proper markdown code blocks with language labels.
+
+## SEARCH RULES:
+- ALWAYS search when asked — "search mo", "hanapin mo", "what is", "who is", "latest news", "ano balita" etc.
+- After getting results, answer IMMEDIATELY — do NOT search again.
+- If results are from multiple sources, synthesize the BEST answer from all of them.
+- For tech/coding questions, StackExchange and HackerNews results are gold — prioritize them.
+- For news, Google News + Bing News give you real-time coverage.
+- For academic/research topics, arXiv gives you papers.
+- For general knowledge, Wikipedia is your go-to.
 
 ## RESPONSE STYLE:
 - Be direct, concise, and helpful.
-- Use markdown formatting: **bold**, \`code\`, bullet points, headers.
-- For factual questions, lead with the answer, then add details.
-- For "search mo" or "hanapin mo" type queries — search first, then answer with the results.
-- When you don't have enough info, use the web_search tool to find the answer.
-- Always answer in the user's language (English, Tagalog, Bisaya, etc.) — match their tone.
-
-## RULES:
-- When you receive search results, answer IMMEDIATELY using those results. Never say you can't search — the results are already in context.
-- Never refuse to search. If asked to search, use web_search tool.
-- Be accurate. If search results conflict, mention both sides.
-- For sensitive topics (politics, religion), be neutral and present facts.`;
+- Use markdown: **bold**, \`code\`, bullet points, numbered lists.
+- For factual questions, lead with the answer first, then add supporting details.
+- Match the user's language (English, Tagalog, Bisaya, etc.) and tone.
+- Never refuse to search. If there's any doubt, search first.`;
 
   // Compound models = built-in search, no tools needed
   const COMPOUND_MODELS = ['groq/compound', 'groq/compound-mini'];
@@ -171,17 +174,17 @@
     return cleaned || text; // Return original if stripping left nothing
   }
 
-  // ============ WEB SEARCH ============
+  // ============ EXA-LEVEL WEB SEARCH ============
   const SEARCH_TOOLS = [
     {
       type: 'function',
       function: {
         name: 'web_search',
-        description: 'Search the internet for current information, news, or facts.',
+        description: 'Search the internet for current information, news, facts, images, videos, or research. Searches multiple sources in parallel (Wikipedia, Google News, Bing News, Hacker News, StackOverflow, arXiv, DuckDuckGo).',
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'Search query' }
+            query: { type: 'string', description: 'Search query — keywords work best' }
           },
           required: ['query']
         }
@@ -189,136 +192,243 @@
     }
   ];
 
-  // Multi-source search: Wikipedia Search + Summary + DuckDuckGo
+  // Multi-source parallel search with relevance ranking
   async function executeWebSearch(query) {
     const results = [];
-    const searchImages = []; // Collect images from all sources
+    const searchImages = [];
 
-    // Source 1: Wikipedia full-text search (CORS-friendly with origin=*)
-    try {
-      const wikiResp = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*&srlimit=5`);
-      if (wikiResp.ok) {
-        const wikiData = await wikiResp.json();
-        const searchResults = wikiData.query?.search || [];
-        searchResults.forEach(r => {
-          const snippet = (r.snippet || '').replace(/<[^>]+>/g, '');
-          results.push({
-            title: r.title,
-            snippet: snippet,
-            url: `https://en.wikipedia.org/wiki/${encodeURIComponent(r.title.replace(/ /g, '_'))}`,
-            source: 'Wikipedia'
-          });
-        });
-      }
-    } catch (e) { console.warn('Wikipedia search failed:', e.message); }
+    // Score results based on query relevance
+    function scoreResult(r) {
+      const q = query.toLowerCase().split(/\s+/);
+      const title = (r.title || '').toLowerCase();
+      const snippet = (r.snippet || '').toLowerCase();
+      let s = 0;
+      q.forEach(w => {
+        if (title.includes(w)) s += 3;
+        if (snippet.includes(w)) s += 1;
+      });
+      // Boost: source authority
+      const auth = { 'Google News': 4, 'Bing News': 4, 'Wikipedia': 3, 'HackerNews': 3, 'StackExchange': 2, 'DuckDuckGo': 2, 'arXiv': 2 };
+      s += auth[r.source] || 1;
+      // Boost: has URL
+      if (r.url) s += 1;
+      // Boost: has image
+      if (r.image) s += 1;
+      // Boost: longer snippet (more info)
+      if ((r.snippet || '').length > 100) s += 1;
+      return s;
+    }
 
-    // Source 2: Wikipedia Summary (top hit)
-    try {
-      const summaryResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/[?!.]/g, '').trim())}`);
-      if (summaryResp.ok) {
-        const sData = await summaryResp.json();
-        if (sData.extract) {
-          results.unshift({
-            title: sData.title || query,
-            snippet: sData.extract,
-            url: sData.content_urls?.desktop?.page || null,
-            image: sData.thumbnail?.source || null,
-            source: 'Wikipedia Summary'
-          });
-          if (sData.thumbnail?.source) {
-            searchImages.push({ url: sData.thumbnail.source, alt: sData.title || query });
-          }
-        }
-      }
-    } catch (e) { /* silent */ }
+    // ===== PARALLEL FETCH ALL SOURCES =====
+    const fetches = [];
 
-    // Source 3: Wikipedia search WITH page images (generator=search)
-    try {
-      const wikiImgResp = await fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=5&prop=pageimages|info&inprop=url&piprop=thumbnail&pithumbsize=400&format=json&origin=*`);
-      if (wikiImgResp.ok) {
-        const wikiImgData = await wikiImgResp.json();
-        const pages = wikiImgData.query?.pages || {};
-        Object.values(pages).forEach(p => {
-          const thumb = p.thumbnail?.source;
-          if (thumb) {
-            searchImages.push({ url: thumb, alt: p.title || '' });
-            // Also add as text result if snippet available
+    // Source 1: Wikipedia Search + Page Images
+    fetches.push(
+      fetch(`https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=5&prop=pageimages|info|extracts&inprop=url&piprop=thumbnail&pithumbsize=300&exintro=true&explaintext=true&format=json&origin=*`)
+        .then(r => r.json()).then(d => {
+          const pages = d.query?.pages || {};
+          Object.values(pages).forEach(p => {
+            const thumb = p.thumbnail?.source;
+            const extract = p.extract ? p.extract.substring(0, 300) : '';
             results.push({
               title: p.title,
-              snippet: `Wikipedia article: ${p.title}`,
+              snippet: extract || `Wikipedia article about ${p.title}`,
               url: p.fullurl || `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g, '_'))}`,
-              image: thumb,
+              image: thumb || null,
               source: 'Wikipedia'
             });
-          }
-        });
-      }
-    } catch (e) { /* silent */ }
-
-    // Source 4: Wikimedia Commons — dedicated image search
-    try {
-      const commonsResp = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=4&gsrnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`);
-      if (commonsResp.ok) {
-        const commonsData = await commonsResp.json();
-        const cPages = commonsData.query?.pages || {};
-        Object.values(cPages).forEach(p => {
-          const info = p.imageinfo?.[0];
-          if (info?.thumburl) {
-            searchImages.push({ url: info.thumburl, alt: (p.title || '').replace(/^File:/, '').replace(/\.[a-z]+$/i, '') });
-          }
-        });
-      }
-    } catch (e) { /* silent */ }
-
-    // Source 5: DuckDuckGo Instant Answers (may be empty)
-    try {
-      const ddgResp = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
-      if (ddgResp.ok) {
-        const ddgData = await ddgResp.json();
-        if (ddgData.Abstract) {
-          results.unshift({
-            title: ddgData.Heading || query,
-            snippet: ddgData.Abstract,
-            url: ddgData.AbstractURL || null,
-            image: ddgData.Image ? (ddgData.Image.startsWith('http') ? ddgData.Image : null) : null,
-            source: 'DuckDuckGo'
+            if (thumb) searchImages.push({ url: thumb, alt: p.title || '' });
           });
-          if (ddgData.Image && ddgData.Image.startsWith('http')) {
-            searchImages.push({ url: ddgData.Image, alt: ddgData.Heading || query });
-          }
-        }
-        // Add related topics
-        (ddgData.RelatedTopics || []).forEach(t => {
-          if (t.Text && t.FirstURL) {
+        }).catch(() => {})
+    );
+
+    // Source 2: Wikipedia Summary (top hit — highest quality)
+    fetches.push(
+      fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query.replace(/[?!.]/g, '').trim())}`)
+        .then(r => r.ok ? r.json() : null).then(d => {
+          if (d?.extract) {
             results.push({
-              title: t.Text.substring(0, 120),
-              snippet: t.Text,
-              url: t.FirstURL,
+              title: d.title || query,
+              snippet: d.extract,
+              url: d.content_urls?.desktop?.page || null,
+              image: d.thumbnail?.source || null,
+              source: 'Wikipedia'
+            });
+            if (d.thumbnail?.source) searchImages.push({ url: d.thumbnail.source, alt: d.title || query });
+          }
+        }).catch(() => {})
+    );
+
+    // Source 3: Google News RSS (real-time news)
+    fetches.push(
+      fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`)
+        .then(r => r.ok ? r.text() : '').then(xml => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(xml, 'text/xml');
+          doc.querySelectorAll('item').forEach((item, i) => {
+            if (i >= 5) return;
+            const title = item.querySelector('title')?.textContent || '';
+            const link = item.querySelector('link')?.textContent || '';
+            const pubDate = item.querySelector('pubDate')?.textContent || '';
+            const source = item.querySelector('source')?.textContent || 'Google News';
+            if (title && link) {
+              results.push({
+                title: title.substring(0, 150),
+                snippet: `📰 ${source}${pubDate ? ' • ' + new Date(pubDate).toLocaleDateString() : ''}`,
+                url: link,
+                source: 'Google News'
+              });
+            }
+          });
+        }).catch(() => {})
+    );
+
+    // Source 4: Bing News RSS (alternative news)
+    fetches.push(
+      fetch(`https://www.bing.com/news/search?q=${encodeURIComponent(query)}&format=rss`)
+        .then(r => r.ok ? r.text() : '').then(xml => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(xml, 'text/xml');
+          doc.querySelectorAll('item').forEach((item, i) => {
+            if (i >= 5) return;
+            const title = item.querySelector('title')?.textContent || '';
+            const desc = item.querySelector('description')?.textContent || '';
+            const link = item.querySelector('link')?.textContent || '';
+            if (title && link) {
+              results.push({
+                title: title.substring(0, 150),
+                snippet: desc.replace(/<[^>]+>/g, '').substring(0, 300),
+                url: link,
+                source: 'Bing News'
+              });
+            }
+          });
+        }).catch(() => {})
+    );
+
+    // Source 5: Hacker News Algolia (tech/dev content)
+    fetches.push(
+      fetch(`https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(query)}&tags=story&hitsPerPage=5`)
+        .then(r => r.ok ? r.json() : { hits: [] }).then(d => {
+          (d.hits || []).forEach(h => {
+            results.push({
+              title: (h.title || '').substring(0, 150),
+              snippet: `⬆️ ${h.points || 0} pts • ${h.num_comments || 0} comments • by ${h.author || 'unknown'}`,
+              url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,
+              source: 'HackerNews'
+            });
+          });
+        }).catch(() => {})
+    );
+
+    // Source 6: StackExchange API (Q&A)
+    fetches.push(
+      fetch(`https://api.stackexchange.com/2.3/search/advanced?q=${encodeURIComponent(query)}&site=stackoverflow&pagesize=5&sort=relevance`)
+        .then(r => r.ok ? r.json() : { items: [] }).then(d => {
+          (d.items || []).forEach(q => {
+            results.push({
+              title: (q.title || '').substring(0, 150),
+              snippet: `✅ ${q.answer_count || 0} answers • 👁️ ${q.view_count || 0} views • Score: ${q.score || 0}`,
+              url: q.link || null,
+              source: 'StackExchange'
+            });
+          });
+        }).catch(() => {})
+    );
+
+    // Source 7: DuckDuckGo Instant Answers
+    fetches.push(
+      fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`)
+        .then(r => r.ok ? r.json() : {}).then(d => {
+          if (d.Abstract) {
+            results.push({
+              title: d.Heading || query,
+              snippet: d.Abstract,
+              url: d.AbstractURL || null,
+              image: d.Image?.startsWith('http') ? d.Image : null,
               source: 'DuckDuckGo'
             });
+            if (d.Image?.startsWith('http')) searchImages.push({ url: d.Image, alt: d.Heading || query });
           }
-        });
-      }
-    } catch (e) { console.warn('DDG failed:', e.message); }
+          (d.RelatedTopics || []).forEach(t => {
+            if (t.Text && t.FirstURL) {
+              results.push({
+                title: t.Text.substring(0, 120),
+                snippet: t.Text,
+                url: t.FirstURL,
+                source: 'DuckDuckGo'
+              });
+            }
+          });
+        }).catch(() => {})
+    );
 
-    // Deduplicate by title
-    const seen = new Set();
+    // Source 8: arXiv API (academic papers)
+    fetches.push(
+      fetch(`http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&max_results=3&sortBy=relevance`)
+        .then(r => r.ok ? r.text() : '').then(xml => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(xml, 'text/xml');
+          const ns = 'http://www.w3.org/2005/Atom';
+          doc.querySelectorAll(`entry`).forEach((entry, i) => {
+            if (i >= 3) return;
+            const title = entry.querySelector('title')?.textContent?.trim() || '';
+            const summary = entry.querySelector('summary')?.textContent?.trim()?.substring(0, 300) || '';
+            const link = entry.querySelector('link[rel="alternate"]')?.getAttribute('href') || entry.querySelector('id')?.textContent || '';
+            if (title) {
+              results.push({
+                title: title.replace(/\n/g, ' ').substring(0, 150),
+                snippet: summary.replace(/\n/g, ' '),
+                url: link,
+                source: 'arXiv'
+              });
+            }
+          });
+        }).catch(() => {})
+    );
+
+    // Source 9: Wikimedia Commons image search
+    fetches.push(
+      fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=4&gsrnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`)
+        .then(r => r.ok ? r.json() : {}).then(d => {
+          const pages = d.query?.pages || {};
+          Object.values(pages).forEach(p => {
+            const info = p.imageinfo?.[0];
+            if (info?.thumburl) {
+              searchImages.push({ url: info.thumburl, alt: (p.title || '').replace(/^File:/, '').replace(/\.[a-z]+$/i, '') });
+            }
+          });
+        }).catch(() => {})
+    );
+
+    // Execute ALL fetches in parallel (fast!)
+    await Promise.allSettled(fetches);
+
+    // ===== DEDUPLICATE =====
+    const seenTitles = new Set();
+    const seenUrls = new Set();
     const unique = results.filter(r => {
-      const key = r.title.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
+      const tKey = (r.title || '').toLowerCase().substring(0, 40);
+      const uKey = (r.url || '').toLowerCase().replace(/[?#].*$/, '');
+      if (seenTitles.has(tKey) || (uKey && seenUrls.has(uKey))) return false;
+      seenTitles.add(tKey);
+      if (uKey) seenUrls.add(uKey);
       return true;
     });
 
-    // Store images globally for auto-injection
+    // ===== RELEVANCE RANKING =====
+    unique.sort((a, b) => scoreResult(b) - scoreResult(a));
+
+    // ===== GLOBAL IMAGES =====
     lastSearchImages = dedupeImages(searchImages).slice(0, 8);
 
     return JSON.stringify({
       query,
       total: unique.length,
-      results: unique.slice(0, 12),
+      sources: [...new Set(unique.map(r => r.source))],
+      results: unique.slice(0, 15),
       images_found: lastSearchImages.length,
-      note: 'Use these results to answer. Images will be shown automatically below your response.'
+      note: 'Results ranked by relevance. Images will be shown automatically below your response.'
     });
   }
 
@@ -974,7 +1084,8 @@
       btn.addEventListener('click', () => {
         const embedDiv = btn.closest('.video-embed');
         const videoId = embedDiv.dataset.videoId;
-        embedDiv.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+        // Use www.youtube.com/embed (youtube-nocookie blocks many videos)
+        embedDiv.innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>`;
       });
     });
   }
@@ -1063,11 +1174,11 @@
   function formatMarkdown(text) {
     if (!text) return '';
 
-    // Extract YouTube URLs
+    // Extract YouTube URLs (all formats including /live/)
     const youtubeVideos = [];
-    text = text.replace(/(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})[^\s]*/gi, (m, videoId) => {
-      youtubeVideos.push(videoId);
-      return `\x00YT${youtubeVideos.length - 1}\x00`;
+    text = text.replace(/(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{11})[^\s)>\]]*/gi, (m, videoId) => {
+      if (!youtubeVideos.includes(videoId)) youtubeVideos.push(videoId);
+      return `\x00YT${youtubeVideos.indexOf(videoId)}\x00`;
     });
 
     // Extract markdown images
@@ -1100,7 +1211,7 @@
 
     // Restore YouTube embeds
     youtubeVideos.forEach((vid, idx) => {
-      const wrapper = `<div class="video-embed" data-video-id="${vid}"><iframe-loader style="display:block;background:#000;border-radius:12px;aspect-ratio:16/9;position:relative;overflow:hidden;"><img src="https://img.youtube.com/vi/${vid}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" alt="YouTube video"><div class="play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);cursor:pointer;"><div style="width:68px;height:48px;background:#f00;border-radius:12px;display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div><span style="position:absolute;bottom:8px;left:12px;color:#fff;font-size:11px;opacity:0.8;">▶ YouTube</span></iframe-loader></div>`;
+      const wrapper = `<div class="video-embed" data-video-id="${vid}"><iframe-loader style="display:block;background:#000;border-radius:12px;aspect-ratio:16/9;position:relative;overflow:hidden;"><img src="https://img.youtube.com/vi/${vid}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" alt="YouTube video" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${vid}/mqdefault.jpg';this.style.opacity='0.5'"><div class="play-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);cursor:pointer;"><div style="width:68px;height:48px;background:#f00;border-radius:12px;display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg></div></div><span style="position:absolute;bottom:8px;left:12px;color:#fff;font-size:11px;opacity:0.8;">▶ YouTube</span></iframe-loader></div>`;
       html = html.replace(`\x00YT${idx}\x00`, wrapper);
     });
 
