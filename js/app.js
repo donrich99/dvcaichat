@@ -76,7 +76,18 @@
   let currentModel = localStorage.getItem('dvc_model') || 'openai/gpt-oss-120b';
   let currentKeyIndex = 0;
   let failedKeys = new Set();
-  let chats = JSON.parse(localStorage.getItem('dvc_chats') || '[]');
+  // Sanitize chats: force all message content to string (fixes corrupted old data)
+  let chats = (() => {
+    try {
+      const loaded = JSON.parse(localStorage.getItem('dvc_chats') || '[]');
+      loaded.forEach(c => {
+        if (Array.isArray(c.messages)) {
+          c.messages.forEach(m => { m.content = typeof m.content === 'string' ? m.content : String(m.content || ''); });
+        }
+      });
+      return loaded;
+    } catch { return []; }
+  })();
   let currentChatId = null;
   let isOnline = true;
   let isGenerating = false;
@@ -856,19 +867,23 @@
     isGenerating = true;
     updateStatusDot('thinking');
 
-    // Build API messages — use multimodal content for last user message
+    // Build API messages — sanitize ALL history, only last msg gets multimodal
     const historyMessages = chat.messages.slice(-20).map(m => ({
       role: m.role,
-      content: m.content
+      // FORCE all content to string (fixes corrupted array content from old sessions)
+      content: typeof m.content === 'string' ? m.content : String(m.content || '')
     }));
 
-    // Replace last user message with multimodal content if we had attachments
-    if (currentAttachments.length > 0 && historyMessages.length > 0) {
+    // Replace ONLY the very last user message with multimodal content if we had attachments
+    if (currentAttachments.length > 0 && hasImages && historyMessages.length > 0) {
       const lastMsg = historyMessages[historyMessages.length - 1];
       if (lastMsg.role === 'user') {
         lastMsg.content = apiUserContent;
       }
     }
+
+    const isVisionRequest = currentAttachments.length > 0 && hasImages;
+    const useStream = !isVisionRequest; // Some vision APIs don't support streaming with images
 
     const apiMessages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -901,50 +916,65 @@
             max_tokens: 4096,
             temperature: 0.7,
             top_p: 0.9,
-            stream: true
+            stream: useStream
           })
         });
 
         if (response.ok) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
           let fullResponse = '';
-          let buffer = '';
 
-          typingEl.remove();
-          const aiMsgEl = appendMessage('ai', '');
-          const bubbleEl = aiMsgEl.querySelector('.message-bubble');
+          if (useStream) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            typingEl.remove();
+            const aiMsgEl = appendMessage('ai', '');
+            const bubbleEl = aiMsgEl.querySelector('.message-bubble');
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue;
-              const data = line.slice(6).trim();
-              if (data === '[DONE]') continue;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
 
-              try {
-                const parsed = JSON.parse(data);
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) {
-                  fullResponse += delta;
-                  bubbleEl.innerHTML = formatMarkdown(fullResponse);
-                  scrollToBottom();
-                }
-              } catch (e) { /* skip */ }
+              for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = line.slice(6).trim();
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta?.content;
+                  if (delta) {
+                    fullResponse += delta;
+                    bubbleEl.innerHTML = formatMarkdown(fullResponse);
+                    scrollToBottom();
+                  }
+                } catch (e) { /* skip */ }
+              }
             }
-          }
 
-          if (fullResponse) {
-            chat.messages.push({ role: 'assistant', content: fullResponse });
-            // Add code block actions + output panels after stream completes
-            addCodeBlockActions(bubbleEl);
-            addOutputPanels(bubbleEl, fullResponse);
+            if (fullResponse) {
+              chat.messages.push({ role: 'assistant', content: fullResponse });
+              addCodeBlockActions(bubbleEl);
+              addOutputPanels(bubbleEl, fullResponse);
+            }
+          } else {
+            // Non-streaming path (for vision/multimodal requests)
+            const data = await response.json();
+            fullResponse = data.choices?.[0]?.message?.content || '';
+            typingEl.remove();
+
+            if (fullResponse) {
+              const aiMsgEl = appendMessage('ai', fullResponse);
+              const bubbleEl = aiMsgEl.querySelector('.message-bubble');
+              chat.messages.push({ role: 'assistant', content: fullResponse });
+              addCodeBlockActions(bubbleEl);
+              addOutputPanels(bubbleEl, fullResponse);
+            }
           }
           success = true;
 
