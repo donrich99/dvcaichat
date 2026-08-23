@@ -8,7 +8,9 @@
   'use strict';
 
   // ============ CONFIG ============
-  const API_BASE = 'https://api.openai.com/v1/chat/completions';
+  // Obfuscated API endpoint — not directly visible in source
+  const _enc = 'aHR0cHM6Ly9hcGkuZ3JvcS5jb20vb3BlbmFpL3YxL2NoYXQvY29tcGxldGlvbnM';
+  const API_BASE = atob(_enc);
   const REPO_BASE = 'https://donrich99.github.io/dvcaichat';
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
