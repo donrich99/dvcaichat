@@ -10,12 +10,8 @@
 
   // ============ CONFIG ============
   // Obfuscated API endpoints — not directly visible in source
-  // Provider 1 (fast models)
   const _enc1 = 'aHR0cHM6Ly9hcGkuZ3JvcS5jb20vb3BlbmFpL3YxL2NoYXQvY29tcGxldGlvbnM';
   const API_BASE = atob(_enc1);
-  // Provider 2 (deep reasoning)
-  const _enc2 = 'aHR0cHM6Ly9hcGkuZGVlcHNlZWsuY29tL2NoYXQvY29tcGxldGlvbnM=';
-  const API_BASE_2 = atob(_enc2);
   const REPO_BASE = 'https://donrich99.github.io/dvcaichat';
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
@@ -35,9 +31,7 @@
   // ============ VISION MODEL DETECTION ============
   // Only these Groq models support image/vision input
   const VISION_MODELS = [
-    'qwen/qwen3.6-27b',
-    'meta-llama/llama-4-scout-17b-16e-instruct',
-    'meta-llama/llama-4-maverick-17b-128e-instruct'
+    'qwen/qwen3.6-27b'
   ];
   const DEFAULT_VISION_MODEL = 'qwen/qwen3.6-27b';
 
@@ -812,7 +806,7 @@
     // AUTO-SWITCH: If images are attached and current model doesn't support vision,
     // temporarily switch to the best vision model for this request
     let requestModel = currentModel;
-    if (hasImages && !VISION_MODELS.includes(currentModel) && currentModel !== 'deepseek-chat') {
+    if (hasImages && !VISION_MODELS.includes(currentModel)) {
       requestModel = DEFAULT_VISION_MODEL;
       appendMessage('ai', `ℹ️ <b>Auto-switched to Qwen 3.6 27B (Vision)</b> — your selected model <b>${currentModel}</b> can't process images. Only vision models (Qwen 3.6, Llama 4 Scout/Maverick) support image input.`, true);
       setTimeout(() => {
@@ -895,9 +889,8 @@
     let lastError = '';
     const totalKeys = getKeys().length;
 
-    // Route to correct API based on model
-    const isDeepSeek = requestModel === 'deepseek-chat';
-    const endpoint = isDeepSeek ? API_BASE_2 : API_BASE;
+    // API endpoint (single provider — Groq only)
+    const endpoint = API_BASE;
 
     while (!success && attempts < totalKeys) {
       try {
