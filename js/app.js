@@ -20,7 +20,7 @@
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
 
-  const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You are built by promode. You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers. You can write code, explain anything, help with business ideas, and much more. Be concise but thorough. Use markdown formatting when helpful. Format code blocks properly with language tags. IMPORTANT: You can VIEW and ANALYZE images that users send (describe them, extract text, explain content), but you CANNOT generate, edit, or manipulate images. If asked to edit an image, politely explain that you can analyze it but image editing is not available yet — suggest what they can do instead (e.g., describe the edit needed so they can do it in Canva/Photoshop).`;
+  const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful, and friendly AI assistant created by @dvc (boss). You are built by promode. You respond in the language the user uses (English, Tagalog, Bisaya, etc.). You are smart, witty, and always give the best answers. You can write code, explain anything, help with business ideas, and much more. Be concise but thorough. Use markdown formatting when helpful. Format code blocks properly with language tags. IMPORTANT: When images are sent to you, you can DESCRIBE, ANALYZE, READ TEXT (OCR), and EXPLAIN the image content in detail. However, you CANNOT generate, create, edit, or manipulate images. If a user asks you to edit a photo, explain what changes they should make and suggest tools (Canva, Photoshop, GIMP) they can use.`;
 
   // Obfuscated model ID mapping (display names → real API IDs)
   const MODEL_MAP = {
@@ -31,6 +31,15 @@
   function resolveModel(model) {
     return MODEL_MAP[model] || model;
   }
+
+  // ============ VISION MODEL DETECTION ============
+  // Only these Groq models support image/vision input
+  const VISION_MODELS = [
+    'qwen/qwen3.6-27b',
+    'meta-llama/llama-4-scout-17b-16e-instruct',
+    'meta-llama/llama-4-maverick-17b-128e-instruct'
+  ];
+  const DEFAULT_VISION_MODEL = 'qwen/qwen3.6-27b';
 
   // ============ USER ID MANAGEMENT ============
   function getUserId() {
@@ -789,6 +798,18 @@
     const hasImages = currentAttachments.some(a => a.type === 'image');
     const hasFiles = currentAttachments.some(a => a.type === 'file');
 
+    // AUTO-SWITCH: If images are attached and current model doesn't support vision,
+    // temporarily switch to the best vision model for this request
+    let requestModel = currentModel;
+    if (hasImages && !VISION_MODELS.includes(currentModel) && currentModel !== 'deepseek-chat') {
+      requestModel = DEFAULT_VISION_MODEL;
+      appendMessage('ai', `ℹ️ <b>Auto-switched to Qwen 3.6 27B (Vision)</b> — your selected model <b>${currentModel}</b> can't process images. Only vision models (Qwen 3.6, Llama 4 Scout/Maverick) support image input.`, true);
+      setTimeout(() => {
+        const lastRow = messagesEl.lastElementChild;
+        if (lastRow) lastRow.remove();
+      }, 8000);
+    }
+
     if (hasImages || hasFiles) {
       apiUserContent = [];
       // Add text prompt if any
@@ -860,7 +881,7 @@
     const totalKeys = getKeys().length;
 
     // Route to correct API based on model
-    const isDeepSeek = currentModel === 'deepseek-chat';
+    const isDeepSeek = requestModel === 'deepseek-chat';
     const endpoint = isDeepSeek ? API_BASE_2 : API_BASE;
 
     while (!success && attempts < totalKeys) {
@@ -875,7 +896,7 @@
             'Authorization': `Bearer ${key}`
           },
           body: JSON.stringify({
-            model: resolveModel(currentModel),
+            model: resolveModel(requestModel),
             messages: apiMessages,
             max_tokens: 4096,
             temperature: 0.7,
