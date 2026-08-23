@@ -503,6 +503,7 @@
   // ============ INIT ============
   async function init() {
     loadTheme();
+    cleanupStaleState(); // Fix stuck state from rate limit / refresh
     setupEventListeners();
     setupKeyboardFix();
     setupSetupScreen();
@@ -816,6 +817,13 @@
   // ============ AUTO-REMOVE TEMP MESSAGES ============
   function removeTempMessages() {
     messagesEl.querySelectorAll('.temp-msg').forEach(el => el.remove());
+  }
+
+  // Clean up stale temp messages on page load (e.g. after rate-limit refresh)
+  function cleanupStaleState() {
+    removeTempMessages();
+    sendBtn.disabled = false;
+    isGenerating = false;
   }
 
   // ============ SEND MESSAGE ============
