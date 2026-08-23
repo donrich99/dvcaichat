@@ -278,13 +278,16 @@
 
 <!-- ============ IMAGE PREVIEW MODAL ============ -->
 <script>
-  // Register Service Worker for PWA
+  // Register Service Worker for PWA — force update to new cache version
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('service-worker.js').catch(err => {
+    navigator.serviceWorker.register('service-worker.js').then(reg => {
+      // Check for updates on every page load
+      reg.update();
+    }).catch(err => {
       console.log('SW registration failed:', err);
     });
   }
 </script>
-<script src="js/app.js?v=3.0"></script>
+<script src="js/app.js?v=6.0"></script>
 </body>
 </html>
