@@ -8,9 +8,13 @@
   'use strict';
 
   // ============ CONFIG ============
-  // Obfuscated API endpoint — not directly visible in source
-  const _enc = 'aHR0cHM6Ly9hcGkuZ3JvcS5jb20vb3BlbmFpL3YxL2NoYXQvY29tcGxldGlvbnM';
-  const API_BASE = atob(_enc);
+  // Obfuscated API endpoints — not directly visible in source
+  // Provider 1 (fast models)
+  const _enc1 = 'aHR0cHM6Ly9hcGkuZ3JvcS5jb20vb3BlbmFpL3YxL2NoYXQvY29tcGxldGlvbnM';
+  const API_BASE = atob(_enc1);
+  // Provider 2 (deep reasoning)
+  const _enc2 = 'aHR0cHM6Ly9hcGkuZGVlcHNlZWsuY29tL2NoYXQvY29tcGxldGlvbnM=';
+  const API_BASE_2 = atob(_enc2);
   const REPO_BASE = 'https://donrich99.github.io/dvcaichat';
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
@@ -523,14 +527,19 @@
 
     let success = false;
     let attempts = 0;
+    let lastError = '';
     const totalKeys = getKeys().length;
+
+    // Route to correct API based on model
+    const isDeepSeek = currentModel === 'deepseek-chat';
+    const endpoint = isDeepSeek ? API_BASE_2 : API_BASE;
 
     while (!success && attempts < totalKeys) {
       try {
         const key = getNextKey();
         if (!key) break;
 
-        const response = await fetch(API_BASE, {
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -588,14 +597,25 @@
 
         } else if (response.status === 429) {
           markKeyFailed();
+          lastError = 'rate_limit';
+          attempts++;
+        } else if (response.status === 401) {
+          markKeyFailed();
+          lastError = 'invalid_key';
+          attempts++;
+        } else if (response.status === 403) {
+          markKeyFailed();
+          lastError = 'blocked';
           attempts++;
         } else {
           markKeyFailed();
+          lastError = 'http_' + response.status;
           attempts++;
         }
 
       } catch (err) {
         attempts++;
+        lastError = 'network';
         if (attempts >= totalKeys) {
           typingEl.remove();
           appendMessage('ai', '⚠️ Network error. Check your internet connection.', true);
@@ -605,7 +625,13 @@
 
     if (!success && attempts >= totalKeys) {
       typingEl.remove();
-      appendMessage('ai', '⚠️ All keys are busy. Wait a moment or add more keys in Settings.', true);
+      const errMessages = {
+        'rate_limit': '⏳ All keys are rate-limited right now. Wait 1 minute and try again.',
+        'invalid_key': '🔑 Keys are invalid or expired. Please add fresh keys in Settings.',
+        'blocked': '🚫 Access blocked. Try a different model or check your keys in Settings.',
+        'network': '🌐 Network error. Check your internet connection and try again.'
+      };
+      appendMessage('ai', errMessages[lastError] || '⚠️ All keys failed. Add more keys in Settings.', true);
     }
 
     sendBtn.disabled = false;
