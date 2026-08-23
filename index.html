@@ -27,15 +27,15 @@
   <div class="setup-card">
     <div class="setup-logo">🤖</div>
     <h1>DVC AI Setup</h1>
-    <p>Enter your Groq API key to get started. You can get one free at <a href="https://console.groq.com" target="_blank" style="color:var(--accent)">console.groq.com</a></p>
+    <p>Enter your API key to get started. You can get a free key from your provider's dashboard.</p>
     <div class="setup-form">
-      <input type="password" id="setupApiKey" placeholder="gsk_..." autocomplete="off" spellcheck="false">
+      <input type="password" id="setupApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
       <label class="setup-show-toggle">
         <input type="checkbox" id="setupShowKey"> Show key
       </label>
       <div class="setup-key-multi" id="setupKeyMulti">
-        <p class="multi-hint">💡 Paste multiple keys (one per line) for rotation — bypass rate limits!</p>
-        <textarea id="setupMultiKeys" rows="4" placeholder="gsk_key1&#10;gsk_key2&#10;gsk_key3"></textarea>
+        <p class="multi-hint">💡 Paste multiple keys (one per line) — auto-switch when one is busy!</p>
+        <textarea id="setupMultiKeys" rows="4" placeholder="key1&#10;key2&#10;key3"></textarea>
       </div>
       <button class="setup-save-btn" id="setupSaveBtn">🚀 Launch DVC AI</button>
       <p class="setup-note">🔒 Key stored locally in your browser only. Never uploaded anywhere.</p>
@@ -79,7 +79,7 @@
     <button class="settings-btn" id="settingsBtn">⚙️ API Key Settings</button>
     <button class="clear-all-btn" id="clearAllBtn">🗑️ Clear All Chats</button>
     <div class="footer-info">
-      <span class="powered-by">⚡ Powered by Groq × promode</span>
+      <span class="powered-by">⚡ Powered by promode × @dvc</span>
       <span class="owner-tag">© @dvc 2026</span>
     </div>
   </div>
@@ -167,15 +167,15 @@
     <div class="modal-body">
       <div class="modal-field">
         <label>Current Key Count: <strong id="keyCountDisplay">0</strong></label>
-        <p class="modal-hint">Add multiple keys for rotation. When one hits rate limit, next key is used automatically.</p>
+        <p class="modal-hint">Add multiple keys — auto-switch when one is busy!</p>
       </div>
       <div class="modal-field">
         <label>Add New Key</label>
-        <input type="password" id="settingsNewKey" placeholder="gsk_..." autocomplete="off">
+        <input type="password" id="settingsNewKey" placeholder="sk-..." autocomplete="off">
       </div>
       <div class="modal-field">
         <label>Or Paste Multiple (one per line)</label>
-        <textarea id="settingsMultiKeys" rows="3" placeholder="gsk_key1&#10;gsk_key2&#10;gsk_key3"></textarea>
+        <textarea id="settingsMultiKeys" rows="3" placeholder="key1&#10;key2&#10;key3"></textarea>
       </div>
       <button class="setup-save-btn" id="settingsSaveKeys">💾 Save Keys</button>
       <div class="modal-field" style="margin-top:16px;">

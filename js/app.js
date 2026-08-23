@@ -1,6 +1,6 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v3.0
-   Groq API + Key Rotation + User Tracking + Block System
+   DVC AI CHATBOT — app.js v3.1
+   AI API + Smart Key Switching + User Tracking
    promode × @dvc 2026
    ============================================ */
 
@@ -8,7 +8,7 @@
   'use strict';
 
   // ============ CONFIG ============
-  const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+  const API_BASE = 'https://api.openai.com/v1/chat/completions';
   const REPO_BASE = 'https://donrich99.github.io/dvcaichat';
   const STATUS_URL = REPO_BASE + '/status.json';
   const USERS_URL = REPO_BASE + '/users.json';
@@ -75,12 +75,12 @@
   // ============ API KEY MANAGEMENT ============
   function getKeys() {
     try {
-      return JSON.parse(localStorage.getItem('dvc_groq_keys') || '[]');
+      return JSON.parse(localStorage.getItem('dvc_api_keys') || '[]');
     } catch { return []; }
   }
 
   function setKeys(keys) {
-    localStorage.setItem('dvc_groq_keys', JSON.stringify(keys));
+    localStorage.setItem('dvc_api_keys', JSON.stringify(keys));
   }
 
   function getNextKey() {
@@ -528,7 +528,7 @@
         const key = getNextKey();
         if (!key) break;
 
-        const response = await fetch(GROQ_URL, {
+        const response = await fetch(API_BASE, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -603,7 +603,7 @@
 
     if (!success && attempts >= totalKeys) {
       typingEl.remove();
-      appendMessage('ai', '⚠️ All keys rate limited. Wait or add more keys in Settings.', true);
+      appendMessage('ai', '⚠️ All keys are busy. Wait a moment or add more keys in Settings.', true);
     }
 
     sendBtn.disabled = false;
