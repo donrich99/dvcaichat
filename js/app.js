@@ -1161,9 +1161,12 @@
               if (data === '[DONE]') continue;
               try {
                 const parsed = JSON.parse(data);
-                const delta = parsed.choices?.[0]?.delta?.content;
-                if (delta) {
-                  fullResponse += delta;
+                const delta = parsed.choices?.[0]?.delta;
+                // Compound models: response comes via 'reasoning' field ONLY (no content)
+                // Tool-capable models: response comes via 'content' field
+                const token = delta?.content || delta?.reasoning || '';
+                if (token) {
+                  fullResponse += token;
                   bubbleEl.innerHTML = formatMarkdown(stripThinking(fullResponse));
                   scrollToBottom();
                 }
