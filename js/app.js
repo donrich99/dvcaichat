@@ -19,11 +19,11 @@
   const SYSTEM_PROMPT = `You are DVC AI — a powerful, helpful AI assistant created by @dvc. You respond in the language the user uses.
 
 ## CAPABILITIES:
-- You have EXA-LEVEL web search — 9 sources searched in parallel (Wikipedia, Google News, Bing News, HackerNews, StackOverflow, arXiv, DuckDuckGo, Wikimedia Commons, Wikipedia Images)
+- You have EXA-LEVEL web search — 10 sources searched in parallel (Wikipedia, Google News, Bing News, HackerNews, StackOverflow, arXiv, DuckDuckGo, YouTube, Wikimedia Commons, Wikipedia Images)
 - When the user asks to search, or asks about current events, news, facts, people, places, trending topics, technology, coding, or ANYTHING that benefits from real data — USE the web_search tool IMMEDIATELY.
 - You do NOT need permission to search. Just search. Every query. No exceptions.
 - Image gallery is automatically shown below your response — you do NOT need to embed images.
-- YouTube videos are automatically embedded when you include YouTube URLs. Videos play inline via proxy if needed. Always give the full URL like https://www.youtube.com/watch?v=VIDEO_ID. Include 2-3 alternative video URLs as backup sources.
+- YouTube videos are automatically embedded when you include YouTube URLs in your response. IMPORTANT: When the user asks for videos, tutorials, or anything visual — you MUST include the YouTube URLs from search results in your response text (like https://www.youtube.com/watch?v=VIDEO_ID). The chatbot auto-embeds them. Include ALL relevant video URLs you find, not just one. Format: show video title + link.
 - Write code in proper markdown code blocks with language labels.
 
 ## SEARCH RULES:
@@ -203,7 +203,7 @@
       type: 'function',
       function: {
         name: 'web_search',
-        description: 'Search the internet for current information, news, facts, images, videos, or research. Searches multiple sources in parallel (Wikipedia, Google News, Bing News, Hacker News, StackOverflow, arXiv, DuckDuckGo).',
+        description: 'Search the internet for current information, news, facts, images, videos, or research. Searches multiple sources in parallel (Wikipedia, Google News, Bing News, Hacker News, StackOverflow, arXiv, DuckDuckGo, YouTube).',
         parameters: {
           type: 'object',
           properties: {
@@ -410,7 +410,32 @@
         }).catch(() => {})
     );
 
-    // Source 9: Wikimedia Commons image search
+    // Source 9: Piped API — YouTube video search
+    fetches.push(
+      fetch(`https://api.piped.private.coffee/search?q=${encodeURIComponent(query)}&filter=videos`, {
+        signal: AbortSignal.timeout(6000)
+      })
+        .then(r => r.ok ? r.json() : { items: [] }).then(d => {
+          (d.items || []).slice(0, 5).forEach(item => {
+            const vid = item.url || '';
+            const videoId = vid.replace('/watch?v=', '');
+            if (videoId && item.title) {
+              results.push({
+                title: (item.title || '').substring(0, 150),
+                snippet: `▶ ${item.uploaderName || 'YouTube'} • ${item.duration ? Math.floor(item.duration/60) + ':' + String(item.duration%60).padStart(2,'0') : ''} • ${item.views ? (item.views/1000).toFixed(1) + 'K views' : ''}`.trim(),
+                url: `https://www.youtube.com/watch?v=${videoId}`,
+                source: 'YouTube',
+                isVideo: true
+              });
+              // Add thumbnail
+              const thumb = item.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+              if (thumb) searchImages.push({ url: thumb, alt: item.title || '' });
+            }
+          });
+        }).catch(() => {})
+    );
+
+    // Source 10: Wikimedia Commons image search
     fetches.push(
       fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=4&gsrnamespace=6&prop=imageinfo&iiprop=url&iiurlwidth=400&format=json&origin=*`)
         .then(r => r.ok ? r.json() : {}).then(d => {
@@ -1186,7 +1211,7 @@
 
     container.innerHTML = `
       <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;">
-        <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1" frameborder="0"
+        <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen style="width:100%;height:100%;min-height:220px;position:absolute;inset:0;"></iframe>
       </div>`;
@@ -1199,15 +1224,16 @@
       onDone(success);
     }
 
-    // If YouTube reports playback, it works
+    // YouTube IFrame API postMessage events
     function handler(e) {
       try {
         const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!d || !d.event) return;
-        if (d.event === 'infoDelivery' || (d.event === 'onStateChange' && d.info === 1)) {
+        // Playback confirmed
+        if (d.event === 'infoDelivery' || d.event === 'onReady' || (d.event === 'onStateChange' && d.info === 1)) {
           done(true);
         }
-        // Embedding disabled (error codes 101, 150)
+        // Embedding disabled / video unavailable (error codes 101, 150)
         if (d.event === 'onError') {
           done(false);
         }
@@ -1215,12 +1241,13 @@
     }
 
     window.addEventListener('message', handler);
-    // Timeout: if YouTube doesn't confirm in 3.5s, assume failure
-    const timer = setTimeout(() => done(false), 3500);
+    // Timeout: if YouTube doesn't confirm in 5s, assume failure → try proxy
+    const timer = setTimeout(() => done(false), 5000);
   }
 
   async function fetchStreamAndPlay(container, videoId) {
     let streamUrl = null;
+    let streamType = 'video/mp4';
 
     // Try each Piped API instance
     for (const apiBase of PIPED_APIS) {
@@ -1230,17 +1257,41 @@
         });
         if (!resp.ok) continue;
         const data = await resp.json();
-        // Find a combined (video+audio) stream — prefer mp4
-        const streams = (data.videoStreams || [])
-          .filter(s => !s.videoOnly && s.mimeType && s.mimeType.includes('video/mp4'))
+        if (data.error) continue;
+
+        // Priority 1: Combined stream (video+audio)
+        const combined = (data.videoStreams || [])
+          .filter(s => !s.videoOnly && s.mimeType && (s.mimeType.includes('video/mp4') || s.mimeType.includes('video/webm')))
           .sort((a, b) => {
-            // Prefer 360p-720p for mobile
             const qa = parseInt(a.quality) || 0;
             const qb = parseInt(b.quality) || 0;
             return Math.abs(qa - 480) - Math.abs(qb - 480);
           });
-        if (streams.length > 0 && streams[0].url) {
-          streamUrl = streams[0].url;
+        if (combined.length > 0 && combined[0].url) {
+          streamUrl = combined[0].url;
+          streamType = combined[0].mimeType || 'video/mp4';
+          break;
+        }
+
+        // Priority 2: HLS manifest
+        const hls = (data.videoStreams || []).find(s => s.mimeType && s.mimeType.includes('x-mpegurl'));
+        if (hls && hls.url) {
+          streamUrl = hls.url;
+          streamType = 'application/x-mpegurl';
+          break;
+        }
+
+        // Priority 3: Any videoOnly stream (no audio but still plays)
+        const videoOnly = (data.videoStreams || [])
+          .filter(s => s.url && s.mimeType && s.mimeType.includes('video/'))
+          .sort((a, b) => {
+            const qa = parseInt(a.quality) || 0;
+            const qb = parseInt(b.quality) || 0;
+            return Math.abs(qa - 360) - Math.abs(qb - 360);
+          });
+        if (videoOnly.length > 0 && videoOnly[0].url) {
+          streamUrl = videoOnly[0].url;
+          streamType = videoOnly[0].mimeType || 'video/mp4';
           break;
         }
       } catch(err) {
@@ -1248,30 +1299,14 @@
       }
     }
 
-    if (!streamUrl) {
-      // Try Invidious API as last resort
-      try {
-        const resp = await fetch(`https://invidious.nerdvpn.de/api/v1/videos/${videoId}?fields=formatStreams`, {
-          signal: AbortSignal.timeout(8000)
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          const fmts = (data.formatStreams || []).filter(s => s.url && s.type && s.type.includes('video/mp4'));
-          if (fmts.length > 0) {
-            streamUrl = fmts[0].url;
-          }
-        }
-      } catch(err) {}
-    }
-
     if (streamUrl) {
-      playDirectStream(container, streamUrl, videoId);
+      playDirectStream(container, streamUrl, videoId, streamType);
     } else {
       showVideoError(container, videoId);
     }
   }
 
-  function playDirectStream(container, streamUrl, videoId) {
+  function playDirectStream(container, streamUrl, videoId, streamType) {
     // Get thumbnail for poster
     const posterUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 
@@ -1280,7 +1315,7 @@
         <video controls autoplay playsinline preload="auto" poster="${posterUrl}"
           style="width:100%;height:100%;min-height:220px;object-fit:contain;background:#000;display:block;"
           onerror="window._dvcVideoError(this, '${videoId}', '${streamUrl}')">
-          <source src="${streamUrl}" type="video/mp4">
+          <source src="${streamUrl}" type="${streamType || 'video/mp4'}">
         </video>
       </div>`;
   }
