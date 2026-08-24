@@ -101,6 +101,7 @@
   let currentModel = localStorage.getItem('dvc_model') || 'openai/gpt-oss-120b';
   let currentKeyIndex = 0;
   let failedKeys = new Set();
+  const deadKeys = new Set(); // Keys with 401/403 — never retry
   let chats = (() => {
     try {
       const loaded = JSON.parse(localStorage.getItem('dvc_chats') || '[]');
@@ -177,9 +178,17 @@
     return getKeys()[idx];
   }
 
-  function markKeyFailed() {
+  function markKeyFailed(permanent = false) {
     failedKeys.add(currentKeyIndex - 1);
-    if (failedKeys.size >= getKeys().length) failedKeys.clear();
+    if (permanent) {
+      deadKeys.add(currentKeyIndex - 1); // Never retry 401/403 keys
+    }
+    // Only reset temp failures — never reset dead keys
+    if (failedKeys.size >= getKeys().length) {
+      failedKeys.clear();
+      // But re-add permanently dead keys
+      for (const idx of deadKeys) failedKeys.add(idx);
+    }
   }
 
   function updateKeyStatus() {
@@ -928,13 +937,16 @@
     rateLimitedModels.clear(); // Reset fallback state per request
     const savedModel = currentModel; // Restore after fallback
     const totalKeys = getKeys().length;
-    const useTools = !isCompoundModel(currentModel);
-    const maxAttempts = 3;
+    // useTools must be RECOMPUTED per attempt — model can change via fallback
+    const maxAttempts = 5;
 
     for (let attempt = 0; attempt < maxAttempts && !success; attempt++) {
       try {
         const key = getNextKey();
         if (!key) { lastError = 'No API keys available'; break; }
+
+        // Recompute per attempt: fallback may switch compound ↔ tool-capable
+        const useTools = !isCompoundModel(currentModel);
 
         if (useTools) {
           // === ReAct loop for tool-capable models (gpt-oss, qwen) ===
@@ -966,10 +978,24 @@
               try { const errData = await response.json(); apiErrMsg = errData?.error?.message || 'HTTP ' + response.status; } catch { apiErrMsg = 'HTTP ' + response.status; }
               console.error('API Error:', apiErrMsg);
 
+              // 401/403 = dead key → mark PERMANENTLY failed, try fallback model
+              if (response.status === 401 || response.status === 403) {
+                markKeyFailed(true);
+                const altModel = getNextFallbackModel(currentModel);
+                if (altModel && altModel !== currentModel) {
+                  removeTempMessages();
+                  appendMessage('ai', `🔑 Dead API key — switching to ${altModel}...`, false, true);
+                  currentModel = altModel;
+                }
+                lastError = 'API key invalid — trying backup';
+                break;
+              }
+
               // Rate limit (429) — auto-retry with model fallback
               if (response.status === 429) {
                 const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
                 const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
+                markKeyFailed(); // Rotate key
                 // Try a different model first
                 const altModel = getNextFallbackModel(currentModel);
                 if (altModel) {
@@ -1063,9 +1089,23 @@
             try { const errData = await response.json(); apiErrMsg = errData?.error?.message || 'HTTP ' + response.status; } catch { apiErrMsg = 'HTTP ' + response.status; }
             console.error('API Error:', apiErrMsg);
 
+            // 401 = dead key → mark PERMANENTLY failed, retry with next key + fallback model
+            if (response.status === 401 || response.status === 403) {
+              markKeyFailed(true);
+              const altModel = getNextFallbackModel(currentModel);
+              if (altModel && altModel !== currentModel) {
+                removeTempMessages();
+                appendMessage('ai', `🔑 Dead API key — switching to ${altModel}...`, false, true);
+                currentModel = altModel;
+              }
+              lastError = 'API key invalid — trying backup';
+              continue;
+            }
+
             if (response.status === 429) {
               const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
               const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
+              markKeyFailed(); // Rate-limited key — rotate to next key too
               // Try a different model
               const altModel = getNextFallbackModel(currentModel);
               if (altModel) {
