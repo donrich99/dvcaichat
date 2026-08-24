@@ -1981,3 +1981,298 @@ body {
   .suggestion-card { padding: 8px; }
   .sg-desc { display: none; }
 }
+
+/* =============================================
+   AIBOT ICON — 3D BOUNCE v7.0
+   promode × @dvc 2026
+   ============================================= */
+
+/* Sidebar logo icon */
+.logo-icon-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  object-fit: cover;
+  animation: icon3dBounce 2.2s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  filter: drop-shadow(0 4px 8px rgba(124, 58, 237, 0.45));
+}
+
+/* Setup screen logo */
+.setup-logo-img {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  object-fit: cover;
+  margin-bottom: 12px;
+  animation: icon3dBounce 2.2s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  filter: drop-shadow(0 6px 16px rgba(124, 58, 237, 0.55));
+}
+
+/* Welcome screen logo */
+.welcome-logo-img {
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto 16px;
+  box-shadow: 0 12px 40px rgba(124, 58, 237, 0.45), 0 4px 14px rgba(59, 130, 246, 0.3);
+  animation: icon3dBounceBig 2.6s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+}
+
+/* 3D bounce keyframes — squash & stretch + rotateX tilt for depth */
+@keyframes icon3dBounce {
+  0%, 100% {
+    transform: translateY(0) scale(1, 1) perspective(300px) rotateX(0deg);
+  }
+  15% {
+    transform: translateY(-14px) scale(0.94, 1.06) perspective(300px) rotateX(-12deg);
+  }
+  30% {
+    transform: translateY(-22px) scale(0.92, 1.08) perspective(300px) rotateX(-16deg);
+    filter: drop-shadow(0 14px 18px rgba(124, 58, 237, 0.35));
+  }
+  45% {
+    transform: translateY(-26px) scale(0.95, 1.05) perspective(300px) rotateX(-10deg);
+  }
+  60% {
+    transform: translateY(-14px) scale(1, 1);
+  }
+  75% {
+    transform: translateY(0) scale(1.08, 0.88) perspective(300px) rotateX(6deg);
+  }
+  85% {
+    transform: translateY(0) scale(0.96, 1.04);
+  }
+}
+
+@keyframes icon3dBounceBig {
+  0%, 100% {
+    transform: translateY(0) scale(1, 1) perspective(400px) rotateY(0deg);
+  }
+  20% {
+    transform: translateY(-30px) scale(0.93, 1.07) perspective(400px) rotateY(-14deg);
+  }
+  40% {
+    transform: translateY(-46px) scale(0.9, 1.1) perspective(400px) rotateY(-18deg);
+    box-shadow: 0 32px 56px rgba(124, 58, 237, 0.35), 0 8px 20px rgba(59, 130, 246, 0.25);
+  }
+  60% {
+    transform: translateY(-30px) scale(0.95, 1.05) perspective(400px) rotateY(-8deg);
+  }
+  78% {
+    transform: translateY(0) scale(1.12, 0.86) perspective(400px) rotateY(5deg);
+  }
+  88% {
+    transform: translateY(0) scale(0.95, 1.05) perspective(400px) rotateY(0deg);
+  }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .logo-icon-img,
+  .setup-logo-img,
+  .welcome-logo-img {
+    animation: none;
+  }
+}
+
+/* =============================================
+   WEATHER EFFECT LAYER — RAIN / CLOUDS / THUNDER
+   Dark mode = rain + clouds + lightning every 10s
+   Light mode = drifting blue clouds every 10s
+   Layer sits BEHIND all UI — pointer-events none
+   ============================================= */
+
+.weather-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Make sure app UI stacks above weather layer.
+   NOTE: .sidebar keeps its original z-index:100, .overlay stays 99,
+   modal-overlay 9999, offline 10000 — do NOT change them here. */
+.main {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- CLOUDS ---------- */
+.weather-clouds {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cloud-puff {
+  position: absolute;
+  background: radial-gradient(circle at 30% 70%, #ffffff 0%, #e8eef7 45%, transparent 70%),
+              radial-gradient(circle at 65% 60%, #ffffff 0%, #dfe9f5 50%, transparent 72%);
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform, opacity;
+  filter: blur(0.4px);
+}
+
+.cloud-puff.drifting {
+  opacity: 1;
+  transition: opacity 2s ease;
+}
+
+.dark-theme-cloud {
+  background: radial-gradient(circle at 30% 70%, #4a5568 0%, #2d3748 45%, transparent 70%),
+              radial-gradient(circle at 65% 60%, #3d4859 0%, #1a202c 50%, transparent 72%);
+}
+
+.light-theme-cloud-blue {
+  background: radial-gradient(circle at 30% 70%, rgba(147, 197, 253, 0.85) 0%, rgba(96, 165, 250, 0.55) 45%, transparent 70%),
+              radial-gradient(circle at 65% 60%, rgba(191, 219, 254, 0.9) 0%, rgba(147, 197, 253, 0.6) 50%, transparent 72%);
+}
+
+/* Cloud drift animations */
+@keyframes cloudDriftRight {
+  from { transform: translateX(-30vw); }
+  to   { transform: translateX(115vw); }
+}
+
+@keyframes cloudDriftLeft {
+  from { transform: translateX(115vw); }
+  to   { transform: translateX(-30vw); }
+}
+
+/* ---------- RAIN (dark mode) ---------- */
+.weather-rain {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.rain-drop {
+  position: absolute;
+  top: -5%;
+  width: 2px;
+  height: 68px;
+  background: linear-gradient(to bottom, rgba(174, 194, 224, 0), rgba(174, 194, 224, 0.75));
+  border-radius: 2px;
+  will-change: transform;
+  animation: rainFall 0.9s linear forwards;
+}
+
+.rain-drop.heavy {
+  width: 2.5px;
+  height: 90px;
+  background: linear-gradient(to bottom, rgba(140, 170, 210, 0), rgba(140, 170, 210, 0.85));
+}
+
+@keyframes rainFall {
+  from { transform: translateY(-10vh) translateX(0); }
+  to   { transform: translateY(115vh) translateX(-6vw); }
+}
+
+.rain-splash {
+  position: absolute;
+  bottom: 4%;
+  width: 6px;
+  height: 6px;
+  border: 1.5px solid rgba(174, 194, 224, 0.6);
+  border-radius: 50%;
+  opacity: 0;
+  animation: splashGrow 0.6s ease-out forwards;
+}
+
+@keyframes splashGrow {
+  0%   { transform: scale(0.2); opacity: 0.8; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* ---------- LIGHTNING / THUNDER (dark mode) ---------- */
+.weather-lightning {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+
+.lightning-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 45% at 50% 0%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(190, 200, 255, 0.55) 30%,
+      rgba(120, 120, 200, 0.22) 60%,
+      transparent 80%);
+  opacity: 0;
+}
+
+.lightning-flash.flash-1 {
+  animation: thunderFlash1 0.9s ease-out forwards;
+}
+
+.lightning-flash.flash-2 {
+  animation: thunderFlash2 1.4s ease-out forwards;
+}
+
+@keyframes thunderFlash1 {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  18%  { opacity: 0.15; }
+  30%  { opacity: 0.85; }
+  55%  { opacity: 0.1; }
+  65%  { opacity: 0.45; }
+  100% { opacity: 0; }
+}
+
+@keyframes thunderFlash2 {
+  0%   { opacity: 0; }
+  6%   { opacity: 1; }
+  14%  { opacity: 0.1; }
+  22%  { opacity: 0.9; }
+  40%  { opacity: 0.05; }
+  52%  { opacity: 0.6; }
+  70%  { opacity: 0; }
+}
+
+/* Lightning bolt shape */
+.lightning-bolt {
+  position: absolute;
+  top: 6%;
+  width: 34px;
+  height: 150px;
+  opacity: 0;
+  background: linear-gradient(160deg,
+      rgba(255, 255, 240, 0) 0%,
+      rgba(255, 255, 230, 1) 18%,
+      rgba(255, 245, 150, 0.95) 45%,
+      rgba(255, 255, 240, 0.9) 70%,
+      rgba(255, 255, 200, 0) 100%);
+  clip-path: polygon(62% 0%, 20% 44%, 44% 44%, 30% 74%, 82% 30%, 54% 30%, 78% 0%);
+  filter: drop-shadow(0 0 14px rgba(255, 250, 180, 0.95)) drop-shadow(0 0 34px rgba(200, 200, 255, 0.6));
+}
+
+.lightning-bolt.strike {
+  animation: boltStrike 0.75s ease-out forwards;
+}
+
+@keyframes boltStrike {
+  0%   { opacity: 0; transform: scale(0.7) translateY(-20px); }
+  10%  { opacity: 1; transform: scale(1.02) translateY(0); }
+  22%  { opacity: 0.2; }
+  32%  { opacity: 0.95; }
+  55%  { opacity: 0.1; }
+  68%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
+/* ---------- LIGHT MODE BLUE SKY TINT (subtle) ---------- */
+html[data-theme="light"] .weather-layer {
+  background: linear-gradient(180deg, rgba(186, 225, 255, 0.16) 0%, rgba(219, 240, 255, 0.10) 40%, transparent 75%);
+}
+
+/* ---------- PERFORMANCE: pause when tab hidden ---------- */
+.weather-layer.paused * {
+  animation-play-state: paused !important;
+}

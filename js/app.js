@@ -1,8 +1,9 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v6.4
+   DVC AI CHATBOT — app.js v7.0
    FULLY TESTED & FIXED — All 8 bugs resolved
    Tool calling + compound built-in search
    Wikipedia Search + Qwen thinking stripped
+   NEW: 3D bouncing Aibot icon + weather effects
    promode × @dvc 2026
    ============================================ */
 
@@ -560,6 +561,7 @@
   // ============ INIT ============
   async function init() {
     loadTheme();
+    resetWeatherForTheme(getTheme()); // Start weather effect cycle (10s)
     cleanupStaleState(); // Fix stuck state from rate limit / refresh
     setupEventListeners();
     setupKeyboardFix();
@@ -784,7 +786,183 @@
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('dvc_theme', next);
     $('#themeToggle').textContent = next === 'dark' ? '🌙' : '☀️';
+    resetWeatherForTheme(next);
   }
+
+  // ============ WEATHER EFFECT SYSTEM — RAIN / CLOUDS / THUNDER ============
+  // Every 10s: dark mode triggers storm burst (clouds + rain + lightning)
+  // Every 10s: light mode triggers blue cloud drift
+  const weatherState = { timer: null, activeStorm: false };
+
+  function getTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+  }
+
+  function clearWeatherLayer() {
+    const cloudsEl = $('#weatherClouds');
+    const rainEl   = $('#weatherRain');
+    const ltnEl    = $('#weatherLightning');
+    if (cloudsEl) cloudsEl.innerHTML = '';
+    if (rainEl)   { rainEl.innerHTML = ''; rainEl.style.display = 'none'; rainEl.style.opacity = '1'; }
+    if (ltnEl)    { ltnEl.innerHTML = ''; ltnEl.style.display = 'none'; }
+    weatherState.activeStorm = false;
+  }
+
+  function resetWeatherForTheme(theme) {
+    clearWeatherLayer();
+    clearInterval(weatherState.timer);
+    scheduleNextWeather(theme);
+  }
+
+  // ---------- DARK MODE: STORM BURST ----------
+  function triggerStormBurst() {
+    if (getTheme() !== 'dark' || weatherState.activeStorm) return;
+    weatherState.activeStorm = true;
+
+    const cloudsEl = $('#weatherClouds');
+    const rainEl   = $('#weatherRain');
+    const ltnEl    = $('#weatherLightning');
+    if (!cloudsEl || !rainEl || !ltnEl) return;
+
+    // 1. Dark clouds drift in
+    spawnClouds(cloudsEl, 10, 'dark-theme-cloud', 8500);
+
+    // 2. After 1.8s → rain starts (2 waves for continuous downpour feel)
+    setTimeout(() => {
+      rainEl.style.display = 'block';
+      spawnRain(rainEl, 150);
+      // Second wave while first is falling
+      setTimeout(() => spawnRain(rainEl, 110), 2200);
+    }, 1800);
+
+    // 3. Lightning strikes at 3s and 5.5s
+    setTimeout(() => {
+      ltnEl.innerHTML = '';
+      ltnEl.style.display = 'block';
+      triggerLightning(ltnEl);
+    }, 3000);
+
+    setTimeout(() => {
+      triggerLightning(ltnEl);
+    }, 5500);
+
+    // 4. Rain continues then fades
+    setTimeout(() => {
+      rainEl.style.transition = 'opacity 2s ease';
+      rainEl.style.opacity = '0';
+      setTimeout(() => {
+        rainEl.style.opacity = '1';
+        rainEl.style.transition = '';
+      }, 3000);
+    }, 6500);
+
+    // 5. After 8.5s → clean up
+    setTimeout(() => {
+      clearWeatherLayer();
+      weatherState.activeStorm = false;
+    }, 8500);
+  }
+
+  function spawnClouds(container, count, cls, lifetime) {
+    const vw = Math.max(window.innerWidth || 1200, 600);
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('div');
+      el.className = 'cloud-puff ' + cls;
+      const size  = 120 + Math.random() * 220;
+      const top   = -15 + Math.random() * 35;
+      const delay = Math.random() * 2.2;
+      const dur   = (5 + Math.random() * 3) * (lifetime / 8000);
+      const fromLeft = Math.random() > 0.5;
+      el.style.width  = size + 'px';
+      el.style.height = (size * 0.48) + 'px';
+      el.style.top    = top + '%';
+      el.style.opacity = '0';
+      el.style.animationDuration = dur + 's';
+      el.style.animationDelay    = delay + 's';
+      el.style.animationName     = fromLeft ? 'cloudDriftRight' : 'cloudDriftLeft';
+      el.style.animationTimingFunction = 'linear';
+      el.style.animationIterationCount = '1';
+      el.style.animationFillMode  = 'forwards';
+      container.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('drifting'));
+      setTimeout(() => el.remove(), (dur + delay + 1.5) * 1000);
+    }
+  }
+
+  function spawnRain(container, count) {
+    const vw = window.innerWidth || 1200;
+    const n = vw < 600 ? Math.floor(count * 0.55) : count; // lighter on mobile
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div');
+      const heavy = Math.random() > 0.7;
+      el.className = 'rain-drop' + (heavy ? ' heavy' : '');
+      el.style.left = (Math.random() * 105) + '%';
+      el.style.animationDuration = (0.7 + Math.random() * 0.5) + 's';
+      el.style.animationDelay    = (Math.random() * 2) + 's';
+      container.appendChild(el);
+      setTimeout(() => el.remove(), 4500);
+    }
+  }
+
+  function triggerLightning(container) {
+    // Screen flash overlay
+    const flash = document.createElement('div');
+    flash.className = 'lightning-flash';
+    container.appendChild(flash);
+    requestAnimationFrame(() => {
+      flash.classList.add(Math.random() > 0.4 ? 'flash-1' : 'flash-2');
+      setTimeout(() => flash.remove(), 1800);
+    });
+
+    // Bolt shape
+    const bolt = document.createElement('div');
+    bolt.className = 'lightning-bolt';
+    bolt.style.left = (20 + Math.random() * 60) + '%';
+    container.appendChild(bolt);
+    requestAnimationFrame(() => {
+      bolt.classList.add('strike');
+      setTimeout(() => bolt.remove(), 1000);
+    });
+
+    // (Subtle rumble handled by browser via the visual cue —
+    //  no Audio API needed for pure visual weather effect)
+  }
+
+  // ---------- LIGHT MODE: BLUE CLOUD DRIFT ----------
+  function triggerBlueCloudDrift() {
+    if (getTheme() !== 'light' || weatherState.activeStorm) return;
+    weatherState.activeStorm = true;
+
+    const cloudsEl = $('#weatherClouds');
+    if (!cloudsEl) return;
+
+    spawnClouds(cloudsEl, 14, 'light-theme-cloud-blue', 8800);
+
+    setTimeout(() => {
+      weatherState.activeStorm = false;
+    }, 8800);
+  }
+
+  // ---------- SCHEDULER ----------
+  function scheduleNextWeather(theme) {
+    const interval = 10000; // every 10 seconds
+    weatherState.timer = setInterval(() => {
+      if (getTheme() === 'dark') triggerStormBurst();
+      else                        triggerBlueCloudDrift();
+    }, interval);
+  }
+
+  // Pause weather when tab is hidden, resume when visible
+  document.addEventListener('visibilitychange', () => {
+    const wl = $('#weatherLayer');
+    if (!wl) return;
+    if (document.hidden) {
+      wl.classList.add('paused');
+    } else {
+      wl.classList.remove('paused');
+      resetWeatherForTheme(getTheme()); // restart cycle fresh
+    }
+  });
 
   // ============ SIDEBAR ============
   function toggleSidebar() {
