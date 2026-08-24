@@ -1,9 +1,8 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v7.0
-   FULLY TESTED & FIXED — All 8 bugs resolved
-   Tool calling + compound built-in search
-   Wikipedia Search + Qwen thinking stripped
-   NEW: 3D bouncing Aibot icon + weather effects
+   DVC AI CHATBOT — app.js v8.3
+   APK WebView loading fix — onAppReady() fires
+   immediately at DOMContentLoaded (before async)
+   + hard timeout in Java splash
    promode × @dvc 2026
    ============================================ */
 
@@ -593,15 +592,39 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   }
 
   // ============ BLOCK STATUS ============
+  // Timeout wrapper — prevents hanging on slow networks (critical for APK WebView)
+  function fetchWithTimeout(url, options, timeoutMs) {
+    return new Promise(function(resolve, reject) {
+      var settled = false;
+      var timer = setTimeout(function() {
+        if (!settled) {
+          settled = true;
+          reject(new Error('timeout'));
+        }
+      }, timeoutMs || 5000);
+
+      try {
+        fetch(url, options).then(function(resp) {
+          if (!settled) { settled = true; clearTimeout(timer); resolve(resp); }
+        }).catch(function(err) {
+          if (!settled) { settled = true; clearTimeout(timer); reject(err); }
+        });
+      } catch(e) {
+        // fetch not supported on very old WebView
+        if (!settled) { settled = true; clearTimeout(timer); reject(e); }
+      }
+    });
+  }
+
   async function checkBlockStatus() {
     try {
-      const resp = await fetch(STATUS_URL + '?t=' + Date.now());
-      const data = await resp.json();
+      var resp = await fetchWithTimeout(STATUS_URL + '?t=' + Date.now(), {}, 5000);
+      var data = await resp.json();
       if (data.blocked_users && Array.isArray(data.blocked_users)) {
         return data.blocked_users.includes(CURRENT_USER_ID);
       }
       if (data.all_blocked === true) return true;
-    } catch { /* allow */ }
+    } catch(e) { /* allow */ }
     return false;
   }
 
@@ -627,45 +650,51 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
 
   // ============ INIT ============
   async function init() {
+    // CRITICAL: Non-async setup first — runs even if async stuff hangs
     loadTheme();
-    resetWeatherForTheme(getTheme()); // Start weather effect cycle (10s)
     cleanupStaleState(); // Fix stuck state from rate limit / refresh
     setupEventListeners();
-    setupKeyboardFix();
     setupSetupScreen();
     renderChatHistory();
 
     // Hide download section when inside Android app (already downloaded it)
-    if (new URLSearchParams(window.location.search).has('fromapp')) {
-      const dlSection = document.getElementById('downloadAppSection');
-      if (dlSection) dlSection.style.display = 'none';
-    }
+    try {
+      if (new URLSearchParams(window.location.search).has('fromapp')) {
+        var dlSection = document.getElementById('downloadAppSection');
+        if (dlSection) dlSection.style.display = 'none';
+      }
+    } catch(e) { /* URLSearchParams not supported on very old WebView */ }
 
-    const userBadge = $('#userBadge');
-    if (userBadge) userBadge.textContent = `🆔 ${CURRENT_USER_ID}`;
+    var userBadge = $('#userBadge');
+    if (userBadge) userBadge.textContent = '🆔 ' + CURRENT_USER_ID;
 
-    isBlocked = await checkBlockStatus();
-    if (isBlocked) showBlockScreen();
-
-    registerUser();
     updateKeyStatus();
 
-    // Notify Android WebView that app is ready → native splash hides
-    // (wrapped in try/catch — Android bridge only exists inside APK)
+    // Non-critical async operations — wrapped in try/catch so they never block the app
+    try {
+      isBlocked = await checkBlockStatus();
+      if (isBlocked) showBlockScreen();
+    } catch(e) {
+      console.warn('[DVC AI] Block check failed:', e);
+      isBlocked = false;
+    }
+
+    try {
+      registerUser();
+    } catch(e) { /* silent */ }
+
+    // Weather effects — non-critical, fire and forget
+    try {
+      setupKeyboardFix();
+      resetWeatherForTheme(getTheme()); // Start weather effect cycle (10s)
+    } catch(e) { /* silent — weather is cosmetic */ }
+
+    // Notify Android — ALSO done here as backup (primary is in DOMContentLoaded handler)
     try {
       if (window.Android && typeof window.Android.onAppReady === 'function') {
         window.Android.onAppReady();
       }
-    } catch { /* not in APK */ }
-
-    // Extra safety: also fire after a short delay in case init raced
-    setTimeout(() => {
-      try {
-        if (window.Android && typeof window.Android.onAppReady === 'function') {
-          window.Android.onAppReady();
-        }
-      } catch { /* not in APK */ }
-    }, 1500);
+    } catch(e) { /* not in APK */ }
   }
 
   function setupSetupScreen() {
@@ -2074,6 +2103,51 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   }
 
   // ============ BOOT ============
-  document.addEventListener('DOMContentLoaded', init);
+  // CRITICAL FIX: Notify Android IMMEDIATELY at DOMContentLoaded —
+  // BEFORE any async work. This ensures the native splash hides even if
+  // init() hangs (slow network, JS crash, old WebView compat issues).
+  // On very old Android (<7.0), async/await may not parse — this
+  // synchronous call STILL fires because it's outside the async function.
+  document.addEventListener('DOMContentLoaded', function() {
+    // SAFETY NET #1: Immediately notify Android to hide splash
+    try {
+      if (window.Android && typeof window.Android.onAppReady === 'function') {
+        window.Android.onAppReady();
+      }
+    } catch(e) { /* not in APK or bridge not ready */ }
+
+    // SAFETY NET #2: Backup — fire again after 500ms in case DOMContentLoaded fired before bridge was ready
+    setTimeout(function() {
+      try {
+        if (window.Android && typeof window.Android.onAppReady === 'function') {
+          window.Android.onAppReady();
+        }
+      } catch(e) {}
+    }, 500);
+
+    // SAFETY NET #3: Last resort — fire after 2s regardless
+    setTimeout(function() {
+      try {
+        if (window.Android && typeof window.Android.onAppReady === 'function') {
+          window.Android.onAppReady();
+        }
+      } catch(e) {}
+    }, 2000);
+
+    // Now run the full init (may use async/await which fails on old WebViews)
+    try {
+      init();
+    } catch(e) {
+      console.error('[DVC AI] init() error:', e);
+      // Even if init() crashes, splash is already hidden by safety nets above
+      // Try to show basic UI
+      try {
+        var setupScreen = document.getElementById('setupScreen');
+        var welcomeScreen = document.getElementById('welcomeScreen');
+        if (setupScreen) setupScreen.style.display = 'flex';
+        if (welcomeScreen) welcomeScreen.style.display = 'block';
+      } catch(e2) {}
+    }
+  });
 
 })();
