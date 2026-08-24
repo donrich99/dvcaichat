@@ -1190,7 +1190,7 @@
   function playVideoInline(container, videoId) {
     // Show loading state
     container.innerHTML = `
-      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+      <div style="position:relative;width:100%;height:100%;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;">
         <div style="text-align:center;color:#aaa;">
           <div class="dvc-spinner" style="margin:0 auto 12px;width:36px;height:36px;border:3px solid #333;border-top-color:#f00;border-radius:50%;animation:spin .8s linear infinite;"></div>
           <p style="font-size:13px;margin:0;">Loading video...</p>
@@ -1210,10 +1210,11 @@
     let settled = false;
 
     container.innerHTML = `
-      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;">
+      <button class="video-fs-btn" onclick="window._dvcFullscreen(this)" title="Fullscreen">⛶ Full</button>
+      <div style="width:100%;height:100%;">
         <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen style="width:100%;height:100%;min-height:220px;position:absolute;inset:0;"></iframe>
+          allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
       </div>`;
 
     function done(success) {
@@ -1311,14 +1312,37 @@
     const posterUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 
     container.innerHTML = `
-      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#000;border-radius:12px;overflow:hidden;">
+      <button class="video-fs-btn" onclick="window._dvcFullscreen(this)" title="Fullscreen">⛶ Full</button>
+      <div style="width:100%;height:100%;">
         <video controls autoplay playsinline preload="auto" poster="${posterUrl}"
-          style="width:100%;height:100%;min-height:220px;object-fit:contain;background:#000;display:block;"
+          style="width:100%;height:100%;object-fit:contain;background:#000;display:block;"
           onerror="window._dvcVideoError(this, '${videoId}', '${streamUrl}')">
           <source src="${streamUrl}" type="${streamType || 'video/mp4'}">
         </video>
       </div>`;
   }
+
+  // Fullscreen video — works on phone (landscape auto) & PC
+  window._dvcFullscreen = function(btn) {
+    const embed = btn.closest('.video-embed');
+    if (!embed) return;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      const req = embed.requestFullscreen || embed.webkitRequestFullscreen;
+      if (req) {
+        try { req.call(embed); } catch(e) {
+          // Fallback: fullscreen the video element itself
+          const video = embed.querySelector('video, iframe');
+          if (video) {
+            const vReq = video.requestFullscreen || video.webkitRequestFullscreen || video.msRequestFullscreen;
+            if (vReq) try { vReq.call(video); } catch(err) {}
+          }
+        }
+      }
+    } else {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+    }
+  };
 
   // Handle video source error — try next quality or show error
   window._dvcVideoError = function(videoEl, videoId, failedUrl) {

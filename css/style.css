@@ -1270,7 +1270,61 @@ body {
   overflow: hidden;
   position: relative;
   background: #000;
+  width: 100%;
   aspect-ratio: 16 / 9;
+  max-height: 60vh;
+}
+
+/* Fullscreen button for video */
+.video-fs-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.2s;
+}
+.video-fs-btn:hover { background: rgba(0,0,0,0.85); }
+
+/* Fullscreen mode — landscape-ready */
+.video-embed:fullscreen,
+.video-embed:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: none !important;
+  aspect-ratio: unset !important;
+  border-radius: 0 !important;
+  z-index: 99999;
+}
+.video-embed:fullscreen iframe,
+.video-embed:fullscreen video,
+.video-embed:-webkit-full-screen iframe,
+.video-embed:-webkit-full-screen video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: unset !important;
+}
+/* Auto-rotate hint for phones */
+@media (orientation: portrait) and (max-width: 600px) {
+  .video-embed {
+    min-height: 220px;
+  }
+}
+@media (orientation: landscape) and (max-width: 900px) {
+  .video-embed {
+    min-height: unset;
+    aspect-ratio: 16/9;
+  }
 }
 
 .video-embed iframe {
@@ -1420,7 +1474,19 @@ body {
   .code-block-header { padding: 5px 8px; }
   .code-action-btn { font-size: 10px; padding: 3px 6px; }
   .search-image { max-width: 100%; }
-  .video-embed { margin: 8px -4px; border-radius: 8px; }
+  /* Video BIGGER on phones — medium-large, easy to tap */
+  .video-embed {
+    margin: 10px -4px;
+    border-radius: 10px;
+    aspect-ratio: auto;
+    min-height: 240px;
+    max-height: none;
+  }
+  .video-embed iframe,
+  .video-embed video {
+    min-height: 240px;
+    height: auto;
+  }
 }
 
 /* =============================================
@@ -1752,11 +1818,18 @@ body {
 
 /* ============ RESPONSIVE MEDIA — FIT ALL DEVICES ============ */
 
-/* Tablet & below: shrink video + code */
+/* Tablet & below: bigger video + code */
 @media (max-width: 768px) {
   .video-embed {
     max-width: 100%;
     border-radius: 10px;
+    aspect-ratio: auto;
+    min-height: 280px;
+    max-height: none;
+  }
+  .video-embed iframe,
+  .video-embed video {
+    min-height: 280px;
   }
 
   .message-bubble pre {
