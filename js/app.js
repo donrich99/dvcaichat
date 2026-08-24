@@ -935,6 +935,7 @@
     let success = false;
     let lastError = '';
     rateLimitedModels.clear(); // Reset fallback state per request
+    window._dvcRateLimitWaited = false; // Reset rate-limit wait flag
     const savedModel = currentModel; // Restore after fallback
     const totalKeys = getKeys().length;
     // useTools must be RECOMPUTED per attempt — model can change via fallback
@@ -995,7 +996,7 @@
               if (response.status === 429) {
                 const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
                 const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
-                markKeyFailed(); // Rotate key
+                // DON'T markKeyFailed() — key is fine, only this MODEL hit daily limit
                 // Try a different model first
                 const altModel = getNextFallbackModel(currentModel);
                 if (altModel) {
@@ -1007,15 +1008,18 @@
                   round--; // Retry same round with new model
                   continue;
                 }
-                // No more fallback models — wait and retry current model
-                if (round < MAX_ROUNDS) {
+                // All fallback models exhausted — wait once, then stop
+                if (!window._dvcRateLimitWaited) {
+                  window._dvcRateLimitWaited = true;
                   removeTempMessages();
-                  appendMessage('ai', `⏳ Rate limit — waiting ${waitSec}s...`, false, true);
+                  appendMessage('ai', `⏳ All models rate-limited — waiting ${waitSec}s for last try...`, false, true);
                   await new Promise(r => setTimeout(r, waitSec * 1000));
                   removeTempMessages();
                   round--;
                   continue;
                 }
+                lastError = 'All models are currently rate-limited. Try again in a few minutes.';
+                break;
               }
               if (response.status === 500) { markKeyFailed(); }
               lastError = apiErrMsg;
@@ -1105,8 +1109,8 @@
             if (response.status === 429) {
               const waitMatch = apiErrMsg.match(/(?:try again in|after)\s+([\d.]+)s/i);
               const waitSec = waitMatch ? Math.ceil(parseFloat(waitMatch[1])) + 1 : 5;
-              markKeyFailed(); // Rate-limited key — rotate to next key too
-              // Try a different model
+              // DON'T markKeyFailed() — the KEY is fine, only THIS MODEL hit its daily limit
+              // Try a different model (keep same key)
               const altModel = getNextFallbackModel(currentModel);
               if (altModel) {
                 removeTempMessages();
@@ -1115,11 +1119,18 @@
                 await new Promise(r => setTimeout(r, 1500));
                 attempt--; continue;
               }
-              removeTempMessages();
-              appendMessage('ai', `⏳ Rate limit — waiting ${waitSec}s...`, false, true);
-              await new Promise(r => setTimeout(r, waitSec * 1000));
-              attempt--;
-              continue;
+              // All fallback models exhausted — wait once, then give up cleanly
+              if (!window._dvcRateLimitWaited) {
+                window._dvcRateLimitWaited = true;
+                removeTempMessages();
+                appendMessage('ai', `⏳ All models rate-limited — waiting ${waitSec}s for last try...`, false, true);
+                await new Promise(r => setTimeout(r, waitSec * 1000));
+                attempt--;
+                continue;
+              }
+              // Already waited — stop retrying
+              lastError = 'All models are currently rate-limited. Try again in a few minutes.';
+              break;
             }
 
             markKeyFailed();
