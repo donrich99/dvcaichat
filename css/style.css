@@ -1987,28 +1987,28 @@ body {
    promode × @dvc 2026
    ============================================= */
 
-/* Sidebar logo icon */
+/* Sidebar logo icon — gentle slow low bounce */
 .logo-icon-img {
   width: 34px;
   height: 34px;
   border-radius: 10px;
   object-fit: cover;
-  animation: icon3dBounce 2.2s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  animation: iconBounceGentle 3.2s ease-in-out infinite;
   filter: drop-shadow(0 4px 8px rgba(124, 58, 237, 0.45));
 }
 
-/* Setup screen logo */
+/* Setup screen logo — gentle bounce */
 .setup-logo-img {
   width: 72px;
   height: 72px;
   border-radius: 18px;
   object-fit: cover;
   margin-bottom: 12px;
-  animation: icon3dBounce 2.2s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  animation: iconBounceGentle 3.4s ease-in-out infinite;
   filter: drop-shadow(0 6px 16px rgba(124, 58, 237, 0.55));
 }
 
-/* Welcome screen logo */
+/* Welcome screen logo — THE MAKULIT TUMBLING ICON */
 .welcome-logo-img {
   width: 96px;
   height: 96px;
@@ -2017,54 +2017,88 @@ body {
   display: block;
   margin: 0 auto 16px;
   box-shadow: 0 12px 40px rgba(124, 58, 237, 0.45), 0 4px 14px rgba(59, 130, 246, 0.3);
-  animation: icon3dBounceBig 2.6s cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+  animation: iconMakulitTumble 5s ease-in-out infinite;
 }
 
-/* 3D bounce keyframes — squash & stretch + rotateX tilt for depth */
-@keyframes icon3dBounce {
+/* Gentle low bounce — sidebar & setup icons */
+@keyframes iconBounceGentle {
   0%, 100% {
-    transform: translateY(0) scale(1, 1) perspective(300px) rotateX(0deg);
-  }
-  15% {
-    transform: translateY(-14px) scale(0.94, 1.06) perspective(300px) rotateX(-12deg);
+    transform: translateY(0) scale(1, 1);
   }
   30% {
-    transform: translateY(-22px) scale(0.92, 1.08) perspective(300px) rotateX(-16deg);
-    filter: drop-shadow(0 14px 18px rgba(124, 58, 237, 0.35));
+    transform: translateY(-6px) scale(0.97, 1.03);
   }
-  45% {
-    transform: translateY(-26px) scale(0.95, 1.05) perspective(300px) rotateX(-10deg);
+  50% {
+    transform: translateY(-9px) scale(0.96, 1.04);
   }
-  60% {
-    transform: translateY(-14px) scale(1, 1);
-  }
-  75% {
-    transform: translateY(0) scale(1.08, 0.88) perspective(300px) rotateX(6deg);
+  70% {
+    transform: translateY(-4px) scale(0.98, 1.02);
   }
   85% {
-    transform: translateY(0) scale(0.96, 1.04);
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+  92% {
+    transform: translateY(0) scale(0.98, 1.02);
   }
 }
 
-@keyframes icon3dBounceBig {
-  0%, 100% {
-    transform: translateY(0) scale(1, 1) perspective(400px) rotateY(0deg);
+/* MAKULIT TUMBLE — low hops + 360 spin + wobble + head shake */
+@keyframes iconMakulitTumble {
+  /* Resting */
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1, 1);
   }
-  20% {
-    transform: translateY(-30px) scale(0.93, 1.07) perspective(400px) rotateY(-14deg);
+  /* Small hop up + tilt right */
+  10% {
+    transform: translateY(-12px) rotate(12deg) scale(0.97, 1.03);
   }
-  40% {
-    transform: translateY(-46px) scale(0.9, 1.1) perspective(400px) rotateY(-18deg);
-    box-shadow: 0 32px 56px rgba(124, 58, 237, 0.35), 0 8px 20px rgba(59, 130, 246, 0.25);
+  /* Peak of first hop + more tilt */
+  18% {
+    transform: translateY(-16px) rotate(18deg) scale(0.95, 1.05);
   }
-  60% {
-    transform: translateY(-30px) scale(0.95, 1.05) perspective(400px) rotateY(-8deg);
+  /* Land first hop — squash */
+  28% {
+    transform: translateY(0) rotate(0deg) scale(1.08, 0.9);
+  }
+  32% {
+    transform: translateY(0) rotate(0deg) scale(1, 1);
+  }
+  /* BIG HOP — full 360 spin while in air! */
+  38% {
+    transform: translateY(-8px) rotate(120deg) scale(0.95, 1.05);
+  }
+  48% {
+    transform: translateY(-18px) rotate(270deg) scale(0.93, 1.07);
+  }
+  /* Landing from 360 — squash */
+  58% {
+    transform: translateY(0) rotate(360deg) scale(1.1, 0.88);
+  }
+  62% {
+    transform: translateY(0) rotate(360deg) scale(1, 1);
+  }
+  /* Wobble left-right-left — head shake "no" */
+  66% {
+    transform: translateY(-4px) rotate(-15deg) scale(1.02, 0.98);
+  }
+  72% {
+    transform: translateY(-6px) rotate(15deg) scale(1.02, 0.98);
   }
   78% {
-    transform: translateY(0) scale(1.12, 0.86) perspective(400px) rotateY(5deg);
+    transform: translateY(-4px) rotate(-10deg) scale(1.01, 0.99);
   }
+  82% {
+    transform: translateY(-2px) rotate(6deg) scale(1.01, 0.99);
+  }
+  /* Settle down */
   88% {
-    transform: translateY(0) scale(0.95, 1.05) perspective(400px) rotateY(0deg);
+    transform: translateY(0) rotate(0deg) scale(1.04, 0.96);
+  }
+  94% {
+    transform: translateY(0) rotate(0deg) scale(0.98, 1.02);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1, 1);
   }
 }
 
