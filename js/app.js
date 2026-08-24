@@ -649,6 +649,23 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
 
     registerUser();
     updateKeyStatus();
+
+    // Notify Android WebView that app is ready → native splash hides
+    // (wrapped in try/catch — Android bridge only exists inside APK)
+    try {
+      if (window.Android && typeof window.Android.onAppReady === 'function') {
+        window.Android.onAppReady();
+      }
+    } catch { /* not in APK */ }
+
+    // Extra safety: also fire after a short delay in case init raced
+    setTimeout(() => {
+      try {
+        if (window.Android && typeof window.Android.onAppReady === 'function') {
+          window.Android.onAppReady();
+        }
+      } catch { /* not in APK */ }
+    }, 1500);
   }
 
   function setupSetupScreen() {
