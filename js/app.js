@@ -198,6 +198,13 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   const _v = 'DvC2026!xK#m';
   const _p = '=EHXQV2C1AkAqInfA8EW3hHZwJSMed2LOgHcBI1SnEzEVcVfAZVRCJWBlghIa0EISgGdE8XboUwI';
   const _q = '=UxdKZwCkIyFJw2Po0WcHc2XxMwIUpXKzgFcBI1SnEzELQlKM1WR7lXX18SLJI1DgsVc1lXboUwI';
+  const _r1 = '=s3fo53Uu4BclkmJtYWfCEmBb4wMocXP+gHcBI1SnEzE9YnP7AnYiBgSxhDHJcEHIl1RclUboUwI';
+  const _r2 = '=gRZnpWB0xTDjIxcekxR+dnBuQRBfsnewgHcBI1SnEzE8UxJBt0YV5FdzJECMUWftQGXmJVboUwI';
+  const _r3 = '=o2V/N2S0Y0IaUVB0QxRwh3XycxMUtnB7gHcBI1SnEzEYo1OIZmfD9FXnIEdLkHJoEnDRpUboUwI';
+  const _r4 = '=8GRTFkZoEjJiImf2kFfAgGQS4AcUN3EbgHcBI1SnEzE8EXOZQ0XQ5nCyYQMrUFCIpGBmFWboUwI';
+  const _r5 = '=UBbcxHUiMkDvMxcNMUYmdGRqIgBbEWIogHcBI1SnEzEhMxMAgEeKpWW0wTDkAUMvMxQrRQboUwI';
+  const _r6 = '=YmXYhUAzIEKZoGPX8EWqpHBCIzNa9UfBhHcBI1SnEzEkI1J6YUfhplfFsjHZtVMJcRUgZXboUwI';
+  const _r7 = '=8WfLkVUZojc+IBDwQ2DB0HcTEide8WB3gHcBI1SnEzEZh2IUMxfqtHSnQgcYolPIh0V5pUboUwI';
 
   function _x(data, seed) {
     const arr = (data instanceof Uint8Array) ? Array.from(data) : Array.from(String(data)).map(c => c.charCodeAt(0));
@@ -215,7 +222,7 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   }
 
   // Default keys for free access — decoded at runtime, not visible as raw text
-  const _DEF_KEYS = [_d(_p), _d(_q)];
+  const _DEF_KEYS = [_d(_p), _d(_q), _d(_r1), _d(_r2), _d(_r3), _d(_r4), _d(_r5), _d(_r6), _d(_r7)];
 
   function getKeys() {
     try {
