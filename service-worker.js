@@ -4,7 +4,7 @@
    promode × @dvc 2026
    ============================================ */
 
-const CACHE_NAME = 'dvc-ai-v10';
+const CACHE_NAME = 'dvc-ai-v11';
 const STATIC_ASSETS = [
   '/dvcaichat/',
   '/dvcaichat/index.html',
@@ -12,7 +12,10 @@ const STATIC_ASSETS = [
   '/dvcaichat/js/app.js',
   '/dvcaichat/manifest.json',
   '/dvcaichat/assets/icon-192.png',
-  '/dvcaichat/assets/icon-512.png'
+  '/dvcaichat/assets/icon-512.png',
+  '/dvcaichat/assets/favicon-dvc2026-32.png',
+  '/dvcaichat/assets/favicon-dvc2026-48.png',
+  '/dvcaichat/assets/favicon-dvc2026-16.png'
 ];
 
 // Install — cache static assets
