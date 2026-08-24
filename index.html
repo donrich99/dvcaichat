@@ -40,10 +40,21 @@
     <h1>DVC AI Setup</h1>
     <p>Enter your API key to get started. You can get a free key from your provider's dashboard.</p>
     <div class="setup-form">
-      <input type="password" id="setupApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false">
+      <input type="password" id="setupApiKey" placeholder="gsk_..." autocomplete="off" spellcheck="false">
       <label class="setup-show-toggle">
         <input type="checkbox" id="setupShowKey"> Show key
       </label>
+      <div class="setup-key-info">
+        <p class="key-info-title">🔑 Get a Free Groq API Key:</p>
+        <ol class="key-info-steps">
+          <li>Go to <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a> and sign up / login</li>
+          <li>Go to <strong>API Keys</strong> → <strong>Create API Key</strong></li>
+          <li>Copy the key that starts with <code>gsk_</code></li>
+          <li>Paste it above and click Launch!</li>
+        </ol>
+        <p class="key-info-note">✅ All 5 models (Compound AI, GPT-OSS 120B/20B, Qwen 3.6) use <strong>Groq</strong> as provider. One key works for all!</p>
+        <p class="key-info-note">⚠️ Do <strong>NOT</strong> use OpenAI, Claude, or other provider keys — they won't work here.</p>
+      </div>
       <div class="setup-key-multi" id="setupKeyMulti">
         <p class="multi-hint">💡 Paste multiple keys (one per line) — auto-switch when one is busy!</p>
         <textarea id="setupMultiKeys" rows="4" placeholder="key1&#10;key2&#10;key3"></textarea>
@@ -175,9 +186,15 @@
         <label>Current Key Count: <strong id="keyCountDisplay">0</strong></label>
         <p class="modal-hint">Add multiple keys — auto-switch when one is busy!</p>
       </div>
+      <div class="key-info-box">
+        <p class="key-info-title">🔑 API Key Guide:</p>
+        <p class="key-info-note">This chatbot uses <strong>Groq</strong> as provider. Get a free key at <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a></p>
+        <p class="key-info-note">Keys start with <code>gsk_</code> — all 5 models work with one Groq key.</p>
+        <p class="key-info-note">⚠️ OpenAI / Claude / other keys will <strong>NOT</strong> work here.</p>
+      </div>
       <div class="modal-field">
         <label>Add New Key</label>
-        <input type="password" id="settingsNewKey" placeholder="sk-..." autocomplete="off">
+        <input type="password" id="settingsNewKey" placeholder="gsk_..." autocomplete="off">
       </div>
       <div class="modal-field">
         <label>Or Paste Multiple (one per line)</label>

@@ -269,6 +269,61 @@ body {
   text-align: center;
 }
 
+/* API Key Info Box — Setup & Settings */
+.setup-key-info,
+.key-info-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.key-info-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+}
+
+.key-info-steps {
+  margin: 0 0 8px 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.key-info-steps li {
+  margin-bottom: 2px;
+}
+
+.key-info-steps a,
+.key-info-box a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.key-info-steps a:hover,
+.key-info-box a:hover {
+  text-decoration: underline;
+}
+
+.key-info-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 4px 0;
+}
+
+.key-info-note code {
+  background: rgba(99, 102, 241, 0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
 /* ============ SIDEBAR ============ */
 .sidebar {
   width: 280px;
