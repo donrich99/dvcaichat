@@ -1534,10 +1534,24 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
     }
   }
 
+  // ============ IMAGE LIGHTBOX — stays inside the app ============
+  function showImageLightbox(src) {
+    let overlay = document.getElementById('imageLightbox');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'imageLightbox';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+      overlay.addEventListener('click', () => { overlay.style.display = 'none'; });
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:90vh;object-fit:contain;border-radius:8px;" onclick="event.stopPropagation()">`;
+    overlay.style.display = 'flex';
+  }
+
   // ============ MEDIA ENHANCEMENTS ============
   function addMediaEnhancements(bubble) {
     bubble.querySelectorAll('.search-image img, .md-image img').forEach(img => {
-      img.addEventListener('click', () => { window.open(img.src, '_blank', 'noopener'); });
+      img.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showImageLightbox(img.src); });
       img.style.cursor = 'pointer';
       img.loading = 'lazy';
     });
@@ -1769,7 +1783,7 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
     lastSearchImages.forEach(img => {
       const card = document.createElement('div');
       card.className = 'gallery-card';
-      card.innerHTML = `<a href="${img.url}" target="_blank" rel="noopener"><img src="${img.url}" alt="${escapeHtml(img.alt)}" loading="lazy" onerror="this.closest('.gallery-card').style.display='none'">${img.alt ? `<span class="gallery-caption">${escapeHtml(img.alt)}</span>` : ''}</a>`;
+      card.innerHTML = `<img src="${img.url}" alt="${escapeHtml(img.alt)}" loading="lazy" onerror="this.closest('.gallery-card').style.display='none'">${img.alt ? `<span class="gallery-caption">${escapeHtml(img.alt)}</span>` : ''}`;
       grid.appendChild(card);
     });
 
@@ -1781,9 +1795,9 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
       bubble.parentNode.insertBefore(gallery, bubble.nextSibling);
     }
 
-    // Wire up click to open images
+    // Wire up click to show image in lightbox (inside the app)
     grid.querySelectorAll('.gallery-card img').forEach(img => {
-      img.addEventListener('click', () => { window.open(img.src, '_blank', 'noopener'); });
+      img.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); showImageLightbox(img.src); });
     });
 
     // Clear images for next response

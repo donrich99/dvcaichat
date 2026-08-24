@@ -4,7 +4,7 @@
    promode × @dvc 2026
    ============================================ */
 
-  const CACHE_NAME = 'dvc-ai-v15';
+  const CACHE_NAME = 'dvc-ai-v16';
 const STATIC_ASSETS = [
   '/dvcaichat/',
   '/dvcaichat/index.html',
