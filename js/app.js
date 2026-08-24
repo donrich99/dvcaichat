@@ -1197,18 +1197,20 @@
         </div>
       </div>`;
 
-    // Step 1: Try YouTube embed first
+    // YouTube embed is PRIMARY — it works for most videos.
+    // We only fall back on an EXPLICIT onError signal from YouTube.
+    // NO timeout-based replacement (that killed working videos).
     tryYouTubeEmbed(container, videoId, (success) => {
       if (!success) {
-        // Step 2: Fetch direct stream URL via Piped API
+        // Only here when YouTube explicitly reports error (embedding disabled)
         fetchStreamAndPlay(container, videoId);
       }
+      // If success or unknown → keep YouTube embed running as-is
     });
   }
 
   function tryYouTubeEmbed(container, videoId, onDone) {
-    let settled = false;
-
+    // Insert the YouTube iframe — it plays on its own.
     container.innerHTML = `
       <button class="video-fs-btn" onclick="window._dvcFullscreen(this)" title="Fullscreen">⛶ Full</button>
       <div style="width:100%;height:100%;">
@@ -1217,33 +1219,35 @@
           allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
       </div>`;
 
+    let settled = false;
+
     function done(success) {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
       window.removeEventListener('message', handler);
       onDone(success);
     }
 
-    // YouTube IFrame API postMessage events
     function handler(e) {
       try {
         const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!d || !d.event) return;
-        // Playback confirmed
-        if (d.event === 'infoDelivery' || d.event === 'onReady' || (d.event === 'onStateChange' && d.info === 1)) {
-          done(true);
-        }
-        // Embedding disabled / video unavailable (error codes 101, 150)
+        // Explicit failure ONLY — error codes 2/5/100/101/150
+        // 101 & 150 = embedding disabled by uploader
         if (d.event === 'onError') {
-          done(false);
+          const code = d.info?.errorCode || d.info;
+          if ([2, 5, 100, 101, 150].includes(code)) {
+            done(false);
+          }
         }
+        // NOTE: No timeout fallback! If YouTube is silent,
+        // the embed is probably fine — leave it alone.
       } catch(err) {}
     }
 
     window.addEventListener('message', handler);
-    // Timeout: if YouTube doesn't confirm in 5s, assume failure → try proxy
-    const timer = setTimeout(() => done(false), 5000);
+    // Safety net: after 15s of silence, stop listening but DON'T touch the embed
+    setTimeout(() => { if (!settled) { settled = true; window.removeEventListener('message', handler); } }, 15000);
   }
 
   async function fetchStreamAndPlay(container, videoId) {
