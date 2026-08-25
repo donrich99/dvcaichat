@@ -666,6 +666,9 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
       }
     } catch(e) { /* URLSearchParams not supported on very old WebView */ }
 
+    // FB/Messenger download section setup (detect FB browser, show escape button)
+    try { setupDownloadSection(); } catch(e) { /* non-critical */ }
+
     var userBadge = $('#userBadge');
     if (userBadge) userBadge.textContent = '🆔 ' + CURRENT_USER_ID;
 
@@ -1634,6 +1637,70 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   ];
 
   // CRITICAL: Check if we're inside the Android APK WebView
+  // ============ FB/MESSENGER BROWSER DETECTION ============
+  // Facebook/Messenger in-app browsers block APK downloads.
+  // Detect them and show "Open in Browser" escape button instead.
+  function isFacebookMessenger() {
+    var ua = navigator.userAgent || '';
+    return /FBAN|FBAV|FB_IAB|Facebook|Instagram|FBAN\/FBIOS|FBMD\/FBSN|[\[]FB[\[_]|MessengerForiOS|MessengerForAndroid|Messenger[\s\/]/i.test(ua)
+      || /MRCHROMEBOX|Comet [|MobileIron]/i.test(ua); // FB Work/Mira browser
+  }
+
+  function setupDownloadSection() {
+    var dlSection = document.getElementById('downloadAppSection');
+    var dlBtn = document.getElementById('apkDownloadBtn');
+    var openBrowserBtn = document.getElementById('openInBrowserBtn');
+    var fbBanner = document.getElementById('fbWarningBanner');
+    var dlNote = document.getElementById('downloadNote');
+
+    // If inside the app, hide entire section
+    if (isInsideApp()) {
+      if (dlSection) dlSection.style.display = 'none';
+      return;
+    }
+
+    if (!dlBtn) return;
+    var apkUrl = dlBtn.href; // e.g. https://donrich99.github.io/dvcaichat/assets/dvc-ai-chatbot-v1.0.apk
+
+    if (isFacebookMessenger()) {
+      // Show warning + escape button; hide normal download link
+      if (fbBanner) fbBanner.style.display = 'flex';
+      if (dlBtn) { dlBtn.style.display = 'none'; } // Hide broken download link
+      if (openBrowserBtn) openBrowserBtn.style.display = 'flex';
+      if (dlNote) dlNote.innerHTML = '⚠️ You are inside the <b>Facebook/Messenger in-app browser</b>. Direct APK downloads are blocked here. Tap <b>"Open in Browser"</b> above, then download the APK from Chrome or your default browser.';
+
+      // Open in external browser via intent:// URL (Android)
+      openBrowserBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        try {
+          // Build intent:// URL to open the full URL in external browser
+          var u = new URL(apkUrl);
+          var intentUrl = 'intent://' + u.hostname + u.pathname + '#Intent;scheme=https;action=android.intent.action.VIEW;S.browser_fallback_url=' + encodeURIComponent(u.href) + ';end';
+          window.location.href = intentUrl;
+        } catch(err) {
+          // Fallback: just navigate (may stay in-app on some FB versions)
+          window.open(apkUrl, '_blank');
+        }
+        // Copy URL to clipboard as fallback
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(apkUrl).catch(function(){});
+        }
+        // Show brief instruction
+        var note = document.getElementById('downloadNote');
+        if (note) note.innerHTML = '📋 <b>Link copied!</b> Open Chrome and paste it in the address bar to download. Or tap "Open in Browser" again — it should open Chrome.';
+      });
+    } else {
+      // Normal browser — download button works directly
+      // Remove download attr (not supported in all browsers) and let Chrome handle .apk mime
+      dlBtn.removeAttribute('download');
+      dlBtn.setAttribute('target', '_self'); // Stay in same window
+      dlBtn.addEventListener('click', function(e) {
+        // Don't prevent — just let the browser navigate to the APK URL
+        // Chrome will auto-download .apk files
+      });
+    }
+  }
+
   function isInsideApp() {
     return new URLSearchParams(window.location.search).has('fromapp');
   }

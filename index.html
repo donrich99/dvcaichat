@@ -41,7 +41,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-dvc2026-32.png?v=1">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-dvc2026-16.png?v=1">
 <link rel="apple-touch-icon" href="assets/icon-180.png?v=2">
-  <link rel="stylesheet" href="css/style.css?v=7.3">
+  <link rel="stylesheet" href="css/style.css?v=7.4">
 </head>
 <body>
 
@@ -200,6 +200,16 @@
               <p>Get the official DVC AI app for your phone — free, fast, and lightweight</p>
             </div>
           </div>
+
+          <!-- FB/Messenger warning banner (shown only when inside FB/Messenger browser) -->
+          <div class="fb-warning-banner" id="fbWarningBanner" style="display:none;">
+            <span class="fb-warn-icon">⚠️</span>
+            <div>
+              <strong>Facebook/Messenger browser detected!</strong>
+              <p>Downloads are often blocked here. Tap <b>"Open in Browser"</b> below to switch to your real browser first, then tap Download there.</p>
+            </div>
+          </div>
+
           <div class="download-app-features">
             <div class="download-feature">
               <span class="df-icon">📱</span>
@@ -215,19 +225,27 @@
             </div>
             <div class="download-feature">
               <span class="df-icon">📦</span>
-              <span>Only 217 KB — almost no storage used</span>
+              <span>Only 240 KB — almost no storage used</span>
             </div>
           </div>
           <div class="download-app-actions">
-            <a href="assets/dvc-ai-chatbot-v1.0.apk" download="dvc-ai-chatbot-v1.0.apk" class="download-app-btn">
+            <a href="assets/dvc-ai-chatbot-v1.0.apk" id="apkDownloadBtn" class="download-app-btn">
               <span class="dl-btn-icon">📥</span>
               <span class="dl-btn-text">
                 <span class="dl-btn-main">Download DVC AI APK</span>
-                <span class="dl-btn-sub">v1.4 · 236 KB · Android 4.1+</span>
+                <span class="dl-btn-sub" id="dlBtnSub">v1.6 · 240 KB · Android 4.1+</span>
               </span>
             </a>
+            <!-- Open in external browser button (FB/Messenger only) -->
+            <button class="open-browser-btn" id="openInBrowserBtn" style="display:none;">
+              <span class="dl-btn-icon">🌐</span>
+              <span class="dl-btn-text">
+                <span class="dl-btn-main">Open in Browser First</span>
+                <span class="dl-btn-sub">Then download from Chrome / real browser</span>
+              </span>
+            </button>
           </div>
-          <p class="download-app-note">After downloading, tap the file to install. You may need to enable "Unknown sources" or "Allow from this source" in your phone settings. The app connects to the same website — your API key setup will carry over.</p>
+          <p class="download-app-note" id="downloadNote">After downloading, tap the file to install. You may need to enable "Unknown sources" or "Allow from this source" in your phone settings. The app connects to the same website — your API key setup will carry over.</p>
         </div>
       </div>
       <!-- ============ /DOWNLOAD APP SECTION ============ -->
@@ -381,6 +399,6 @@
     });
   }
 </script>
-  <script src="js/app.js?v=8.5"></script>
+  <script src="js/app.js?v=9.0"></script>
 </body>
 </html>

@@ -787,6 +787,60 @@ body {
   margin: 0;
 }
 
+/* FB/Messenger warning banner */
+.fb-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.1));
+  border: 1px solid rgba(255, 193, 7, 0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.fb-warn-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.fb-warning-banner strong {
+  color: #ffc107;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 4px;
+}
+.fb-warning-banner p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Open in Browser button (FB/Messenger escape) */
+.open-browser-btn {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #1877f2, #0d65d9);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 24px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 16px rgba(24, 119, 242, 0.3);
+  font-family: inherit;
+}
+.open-browser-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(24, 119, 242, 0.4);
+}
+.open-browser-btn:active {
+  transform: translateY(0);
+}
+
 /* ============ /DOWNLOAD APP SECTION ============ */
 
 .message-row {
@@ -2113,6 +2167,9 @@ body {
   .dl-btn-main { font-size: 13px; }
   .dl-btn-sub { font-size: 10px; }
   .download-app-note { font-size: 11px; }
+  .fb-warning-banner { padding: 10px 12px; gap: 8px; }
+  .fb-warn-icon { font-size: 18px; }
+  .open-browser-btn { padding: 12px 20px; }
 }
 
 /* Landscape phones — keep input visible */
