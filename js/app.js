@@ -1,8 +1,9 @@
 /* ============================================
-   DVC AI CHATBOT — app.js v8.3
-   APK WebView loading fix — onAppReady() fires
-   immediately at DOMContentLoaded (before async)
-   + hard timeout in Java splash
+   DVC AI CHATBOT — app.js v8.5
+   YouTube video fix: youtube-nocookie primary,
+   multi-domain fallback chain, better error
+   detection, more Piped API instances.
+   APK splash fix: instant hide, no delays.
    promode × @dvc 2026
    ============================================ */
 
@@ -1619,14 +1620,23 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   }
 
   // ============ INLINE VIDEO PLAYER — NATIVE <video> + PROXY API ============
-  // Step 1: Try YouTube embed (works for most videos)
-  // Step 2: Fetch direct stream URL from Piped API → play via <video> tag
-  // All playback happens INSIDE the chatbot. Zero redirects.
+  // Step 1: YouTube embed (youtube-nocookie.com primary — less restrictive)
+  // Step 2: On explicit embed error (101/150 = disabled) → Piped API direct stream
+  // Step 3: Piped fails → clickable thumbnail card (opens in-app WebView)
+  // All playback stays INSIDE the chatbot.
 
   const PIPED_APIS = [
     'https://api.piped.private.coffee',
     'https://pipedapi.adminforge.de',
+    'https://pipedapi.drgns.space',
+    'https://api.piped.yt',
+    'https://pipedapi.leptons.xyz',
   ];
+
+  // CRITICAL: Check if we're inside the Android APK WebView
+  function isInsideApp() {
+    return new URLSearchParams(window.location.search).has('fromapp');
+  }
 
   function playVideoInline(container, videoId) {
     // Show loading state
@@ -1638,57 +1648,99 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
         </div>
       </div>`;
 
-    // YouTube embed is PRIMARY — it works for most videos.
-    // We only fall back on an EXPLICIT onError signal from YouTube.
-    // NO timeout-based replacement (that killed working videos).
     tryYouTubeEmbed(container, videoId, (success) => {
       if (!success) {
-        // Only here when YouTube explicitly reports error (embedding disabled)
+        // YouTube explicitly reported error (embedding disabled/not found)
         fetchStreamAndPlay(container, videoId);
       }
-      // If success or unknown → keep YouTube embed running as-is
+      // Success or unknown → keep YouTube embed running
     });
   }
 
   function tryYouTubeEmbed(container, videoId, onDone) {
-    // Insert the YouTube iframe — it plays on its own.
-    container.innerHTML = `
-      <button class="video-fs-btn" onclick="window._dvcFullscreen(this)" title="Fullscreen">⛶ Full</button>
-      <div style="width:100%;height:100%;">
-        <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
-      </div>`;
-
     let settled = false;
+    let attempt = 0;
+
+    // youtube-nocookie.com FIRST — fewer tracking requirements, better WebView compat
+    const EMBED_BASES = [
+      'https://www.youtube-nocookie.com',
+      'https://www.youtube.com',
+    ];
+
+    function cleanup() {
+      window.removeEventListener('message', handler);
+    }
 
     function done(success) {
       if (settled) return;
       settled = true;
-      window.removeEventListener('message', handler);
+      cleanup();
       onDone(success);
+    }
+
+    function insertEmbed(base) {
+      const originParam = encodeURIComponent(location.origin);
+      const embedUrl = `${base}/embed/${videoId}?rel=0&playsinline=1&autoplay=1&modestbranding=1&enablejsapi=1&origin=${originParam}`;
+
+      container.innerHTML = `
+        <button class="video-fs-btn" onclick="window._dvcFullscreen(this)" title="Fullscreen">⛶ Full</button>
+        <div style="width:100%;height:100%;">
+          <iframe id="dvc-yt-frame" src="${embedUrl}" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen style="width:100%;height:100%;position:absolute;inset:0;"></iframe>
+        </div>`;
+    }
+
+    function tryNextDomain() {
+      if (attempt >= EMBED_BASES.length || settled) {
+        done(false);
+        return;
+      }
+
+      const base = EMBED_BASES[attempt];
+      attempt++;
+
+      insertEmbed(base);
+
+      // Listen for YouTube postMessage events (errors AND ready signal)
+      window.addEventListener('message', handler);
+
+      // Safety net: if nothing heard back in 10s, assume embed is fine
+      // (YouTube silently plays when everything works)
+      setTimeout(() => {
+        if (!settled) {
+          done(true); // Assume success — don't touch a possibly-working embed
+        }
+      }, 10000);
     }
 
     function handler(e) {
       try {
+        // Only accept messages from YouTube domains
+        const originOk = e.origin === 'https://www.youtube-nocookie.com' ||
+                         e.origin === 'https://www.youtube.com';
+        if (!originOk) return;
+
         const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (!d || !d.event) return;
-        // Explicit failure ONLY — error codes 2/5/100/101/150
-        // 101 & 150 = embedding disabled by uploader
+
         if (d.event === 'onError') {
-          const code = d.info?.errorCode || d.info;
+          const code = d.info?.errorCode ?? d.info;
+          console.warn('[DVC Video] YouTube error', code);
+          // Codes: 2=invalid param, 5=HTML5 err, 100=not found, 101/150=embed disabled
           if ([2, 5, 100, 101, 150].includes(code)) {
-            done(false);
+            cleanup();
+            tryNextDomain(); // Try next domain before giving up
           }
         }
-        // NOTE: No timeout fallback! If YouTube is silent,
-        // the embed is probably fine — leave it alone.
+        // Player signalled ready — video works
+        if (d.event === 'onReady') {
+          done(true);
+        }
       } catch(err) {}
     }
 
-    window.addEventListener('message', handler);
-    // Safety net: after 15s of silence, stop listening but DON'T touch the embed
-    setTimeout(() => { if (!settled) { settled = true; window.removeEventListener('message', handler); } }, 15000);
+    tryNextDomain();
   }
 
   async function fetchStreamAndPlay(container, videoId) {
@@ -1759,12 +1811,20 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
     container.innerHTML = `
       <button class="video-fs-btn" onclick="window._dvcFullscreen(this)" title="Fullscreen">⛶ Full</button>
       <div style="width:100%;height:100%;">
-        <video controls autoplay playsinline preload="auto" poster="${posterUrl}"
+        <video controls playsinline preload="metadata" poster="${posterUrl}"
           style="width:100%;height:100%;object-fit:contain;background:#000;display:block;"
-          onerror="window._dvcVideoError(this, '${videoId}', '${streamUrl}')">
+          onerror="window._dvcVideoError(this, '${videoId}', '${streamUrl.replace(/'/g, "\\'")}')">
           <source src="${streamUrl}" type="${streamType || 'video/mp4'}">
         </video>
       </div>`;
+
+    // Auto-play the video
+    const video = container.querySelector('video');
+    if (video) {
+      video.play().catch(() => {
+        // Autoplay blocked — user must tap play button (that's fine)
+      });
+    }
   }
 
   // Fullscreen video — works on phone (landscape auto) & PC
@@ -1805,13 +1865,16 @@ ANSWER THE QUESTION NOW. This is your final chance.`;
   };
 
   function showVideoError(container, videoId) {
+    // Last resort: show a nice thumbnail card with retry + YouTube link
+    // In APK, YouTube link opens in the same WebView (whitelisted domain)
     container.innerHTML = `
-      <div style="position:relative;width:100%;height:100%;min-height:200px;background:#111;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+      <div style="position:relative;width:100%;height:100%;min-height:220px;background:#111;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
         <img src="https://img.youtube.com/vi/${videoId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.3;" onerror="this.style.display='none'">
-        <div style="position:relative;z-index:1;text-align:center;">
-          <p style="color:#fff;margin:0 0 8px;font-size:14px;">Unable to load this video</p>
-          <button onclick="window._dvcPlayVideo(this.closest('[data-video-id]'), this.closest('[data-video-id]').dataset.videoId)" style="display:inline-flex;align-items:center;gap:6px;background:#f00;color:#fff;padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;border:none;cursor:pointer;margin-right:8px;">↻ Retry</button>
-          <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;background:#333;color:#fff;padding:8px 18px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;">▶ YouTube ↗</a>
+        <div style="position:relative;z-index:1;text-align:center;padding:20px;">
+          <div style="font-size:48px;margin-bottom:8px;">🎬</div>
+          <p style="color:#fff;margin:0 0 12px;font-size:14px;font-weight:600;">Tap to play on YouTube</p>
+          <button onclick="window._dvcPlayVideo(this.closest('[data-video-id]'), '${videoId}')" style="display:inline-flex;align-items:center;gap:6px;background:#f00;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;border:none;cursor:pointer;margin:4px;">↻ Retry in-app</button>
+          <a href="https://www.youtube.com/watch?v=${videoId}" target="_self" style="display:inline-flex;align-items:center;gap:6px;background:#333;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px;margin:4px;">▶ Open YouTube</a>
         </div>
       </div>`;
   }
